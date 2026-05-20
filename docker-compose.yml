@@ -1,0 +1,25 @@
+services:
+  nllb-server:
+    build:
+      context: ./nllb-server
+      dockerfile: Dockerfile
+
+    # image: nllb-inference:latest
+    environment:
+      HF_HUB_OFFLINE: 1
+      TRANSFORMERS_OFFLINE: 1
+
+    container_name: nllb-api
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models    # Чтобы не качать модель при каждом перезапуске
+      - ./cache:/root/.cache    # Кэш huggingface
+    restart: always
