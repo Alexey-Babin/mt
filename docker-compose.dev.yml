@@ -4,11 +4,12 @@ services:
 
     build:
       context: ./nllb-server
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
 
     environment:
       HF_HUB_OFFLINE: 1
       TRANSFORMERS_OFFLINE: 1
+      DEBUG: 1
 
     deploy:
       resources:
@@ -19,7 +20,11 @@ services:
               capabilities: [gpu]
     ports:
       - "8000:8000"
+      - "5678:5678"
     volumes:
       - ./models:/app/models
       - ./cache:/root/.cache    # Кэш huggingface
-    restart: always
+      # Live reload
+      - ./nllb-server:/app
+    
+    restart: unless-stopped

@@ -9,16 +9,19 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 
 ENV UV_PYTHON_DOWNLOADS=0 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+  PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONUNBUFFERED=1
 
 COPY pyproject.toml uv.lock* ./
 COPY .python-version ./
-RUN uv sync --no-dev --frozen --extra-index-url https://pytorch.org
-
+RUN uv sync --frozen --extra-index-url https://pytorch.org
 COPY *.py .
 COPY *.json .
 
 EXPOSE 8000
+EXPOSE 5678
 
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Не используем --reload!
+CMD ["uv", "run", "python", \
+  "-m", "debugpy", "--listen", "0.0.0.0:5678", \
+  "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

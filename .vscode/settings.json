@@ -1,5 +1,5 @@
 {
-    "cSpell.words": [
-        "Nllb"
-    ]
+  "cSpell.words": ["Nllb"],
+  "python.defaultInterpreterPath": "${workspaceFolder}/nllb-server/.venv/bin/python",
+  "python.analysis.extraPaths": ["${workspaceFolder}/nllb-server"]
 }

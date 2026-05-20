@@ -1,19 +1,38 @@
 {
     "configurations": [
         {
-            "name": "Containers: Python - Fastapi",
-            "type": "docker",
+            "name": "FastAPI local (uv)",
+            "type": "debugpy",
             "request": "launch",
-            "preLaunchTask": "docker-run: debug",
-            "python": {
-                "pathMappings": [
-                    {
-                        "localRoot": "${workspaceFolder}",
-                        "remoteRoot": "/app"
-                    }
-                ],
-                "projectType": "fastapi"
-            }
+            
+            "module": "uvicorn",
+
+            "args": ["main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
+            "cwd": "${workspaceFolder}/nllb-server",
+            "env": {
+                "PYTHONBUFFERED": "1",
+                "MT_MODELS_STORAGE": "/opt/mt/models",
+                "DEBUG": "1"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Attach NLLB Dev Container",
+            "type": "debugpy",
+            "request": "attach",
+
+            "connect": {
+                "host": "127.0.0.1",
+                "port": 5678
+            },
+
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/nllb-server",
+                    "remoteRoot": "/app"
+                }
+            ]
+
         }
     ]
 }

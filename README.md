@@ -30,7 +30,7 @@ NLLB inference сервер, в своём контейнере. Взаимод�
 Для перевода будем модель `facebook/nllb-200-distilled-300M`. Когда RAM будет больше, поменяем модель на `facebook/nllb-200-distilled-600M` или `facebook/nllb-200-distilled-1.3B`
 
 **Сервер**
-Сервер самописный на python или typescript, внутри контейнера. Endpoints:
+Сервер самописный на python, внутри контейнера. Endpoints:
 - POST /translate
 - GET /health
 - GET /languages

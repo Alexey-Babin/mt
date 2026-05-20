@@ -10,3 +10,8 @@ dependencies = [
     "transformers>=5.8.1",
     "uvicorn>=0.47.0",
 ]
+
+[dependency-groups]
+dev = [
+    "debugpy>=1.8.20",
+]
