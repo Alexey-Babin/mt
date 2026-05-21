@@ -2,15 +2,14 @@ import logging
 import os
 from enum import StrEnum
 
+from config import config
 from engine import Translator
 from fastapi import FastAPI, Query
 from languages import languages_db
 from pydantic import BaseModel
 
 # Модель можно задать в переменной окружения
-MODEL_NAME = os.environ.get("MT_MODEL", "nllb-200-distilled-600M")
-MODELS_STORAGE = os.environ.get("MT_MODELS_STORAGE", "/apt/models")
-MODEL_PATH = os.path.join(MODELS_STORAGE, MODEL_NAME)
+MODEL_PATH = os.path.join(config.model_storage, config.model_name)
 
 # Логирование
 logger = logging.getLogger("uvicorn.error")
@@ -22,7 +21,7 @@ DEBUG = os.environ.get("DEBUG", "0") == "1"
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
-logger.debug(f"Working with model {MODEL_NAME}")
+logger.debug(f"Working with model {config.model_name}")
 logger.debug(f"{MODEL_PATH=}")
 
 
@@ -64,7 +63,7 @@ def create_app():
         if not tr.has_cuda:
             logger.warning("No CUDA device found")
         logger.info(
-            f"Initialized translator with model {MODEL_NAME} on device {tr.device}"
+            f"Initialized translator with model {config.model_name} on device {tr.device}"
         )
 
     @app.on_event("shutdown")

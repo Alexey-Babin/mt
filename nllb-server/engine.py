@@ -3,10 +3,11 @@ import re
 from threading import Lock
 
 import torch
+from config import config
 from transformers import AutoModelForSeq2SeqLM, NllbTokenizer
 from utils import split_into_chunks
 
-MODEL_COMPILE = os.environ.get("MT_MODEL_COMPILE", "0") == "1"
+MODEL_COMPILE = config.model_compile
 LANG_PATTERN = re.compile(r"^[a-z]{3}_[A-Z][a-z]{3}$")
 
 
@@ -32,6 +33,9 @@ class Translator:
             self.model_path,
             dtype=torch.float16 if self.has_cuda else torch.float32,
         ).to(self.device)
+
+        # Чтобы не было конфликта между `max_new_tokens` and `max_length`
+        model.generation_config.max_length = None
         model.eval()
         self.model = model
 
@@ -61,13 +65,13 @@ class Translator:
                     chunk.text,
                     return_tensors="pt",
                     truncation=True,
-                    max_length=512,
+                    max_length=config.tokenizer_max_length,
                 ).to(self.device)
 
                 tokens = self.model.generate(
                     **inputs,
                     forced_bos_token_id=forced_bos_token_id,
-                    max_new_tokens=512,
+                    max_new_tokens=config.max_new_tokens,
                     use_cache=True,
                 )
                 translated = self.tokenizer.batch_decode(
