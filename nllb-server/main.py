@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from engine import Translator
 from fastapi import FastAPI, Query
-from languages import read_languages_db
+from languages import languages_db
 from pydantic import BaseModel
 
 # Модель можно задать в переменной окружения
@@ -47,11 +47,10 @@ def create_app():
 
         # Получаем список возможных языков (сразу из модели)
         model_lang_codes = tr.get_supported_languages()
-        languages = read_languages_db()
         app.state.languages = dict(
             sorted(
                 [
-                    (lang_code, languages.get(lang_code))
+                    (lang_code, languages_db.get(lang_code))
                     for lang_code in model_lang_codes
                 ],
                 key=lambda lang: (
