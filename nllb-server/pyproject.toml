@@ -20,6 +20,11 @@ dependencies = [
 [dependency-groups]
 dev = [
     "debugpy>=1.8.20",
+    "lxml>=6.1.1",
+    "markdown-it-py>=4.2.0",
+    "pydantic>=2.13.4",
+    "pytest>=9.0.3",
+    "rich>=15.0.0",
     "ruff>=0.15.14",
 ]
 
@@ -32,6 +37,7 @@ package-dir = { "" = "src" }
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+testpaths = ["tests"]
 
 [tool.mypy]
 python_version = "3.12"
