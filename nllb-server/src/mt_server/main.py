@@ -2,11 +2,13 @@ import logging
 import os
 from enum import StrEnum
 
-from config import config
-from engine import Translator
 from fastapi import FastAPI, Query
-from languages import languages_db
 from pydantic import BaseModel
+
+from mt_server.config import config
+from mt_server.engine import Translator
+from mt_server.languages import languages_db
+from mt_server.translation_service import TextFormat, TranslationService
 
 # Модель можно задать в переменной окружения
 MODEL_PATH = os.path.join(config.model_storage, config.model_name)
@@ -29,6 +31,7 @@ class TranslationRequest(BaseModel):
     text: str
     src_lang: str
     target_lang: str
+    format: TextFormat = TextFormat.AUTO
 
 
 class LanguageLevels(StrEnum):
@@ -43,6 +46,7 @@ def create_app():
     @app.on_event("startup")
     async def startup():
         tr = app.state.translator = Translator(path_to_model=MODEL_PATH)
+        app.state.translation_service = TranslationService(translator=tr)
 
         # Получаем список возможных языков (сразу из модели)
         model_lang_codes = tr.get_supported_languages()
@@ -113,7 +117,13 @@ def create_app():
 
     @app.post("/translate")
     async def translate(req: TranslationRequest):
-        result = app.state.translator.translate(req.text, req.src_lang, req.target_lang)
+        service = app.state.translation_service
+        result = service.translate(
+            text=req.text,
+            src_lang=req.src_lang,
+            tgt_lang=req.target_lang,
+            format=req.format,
+        )
         return {"translated_text": result}
 
     return app

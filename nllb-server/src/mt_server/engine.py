@@ -3,9 +3,10 @@ import re
 from threading import Lock
 
 import torch
-from config import config
 from transformers import AutoModelForSeq2SeqLM, NllbTokenizer
-from utils import split_into_chunks
+
+from mt_server.config import config
+from mt_server.utils import split_into_chunks
 
 MODEL_COMPILE = config.model_compile
 LANG_PATTERN = re.compile(r"^[a-z]{3}_[A-Z][a-z]{3}$")
