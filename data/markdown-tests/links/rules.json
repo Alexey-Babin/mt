@@ -1,0 +1,7 @@
+{
+  "preserve_links": true,
+  "preserve_href": true,
+  "preserve_link_titles": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

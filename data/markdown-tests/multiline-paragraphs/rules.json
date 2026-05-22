@@ -1,0 +1,6 @@
+{
+  "preserve_paragraph_structure": true,
+  "preserve_line_breaks": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

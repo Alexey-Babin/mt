@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
+import shutil
+
+import pypandoc
 
 from mt_server.markdown.extractor import MarkdownTranslationUnitExtractor
-from mt_server.markdown.placeholders import render_segments
-from mt_server.markdown.restorer import MarkdownRestorer
 from mt_server.markdown.units import TranslationUnit
 
 logger = logging.getLogger("uvicorn.error")
@@ -14,28 +15,24 @@ class MarkdownTranslator:
     def __init__(self, translator):
         self.translator = translator
         self.extractor = MarkdownTranslationUnitExtractor()
-        self.restorer = MarkdownRestorer()
+
+        self.pandoc_available = shutil.which("pandoc") is not None
+        if not self.pandoc_available:
+            logger.warning("Pandoc not found — fallback to HTML output")
 
     def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
-        logger.debug(f"Translating markdown, src={src_lang}, tgt={tgt_lang}")
-        logger.debug(f"Input text: {text!r}")
-
         tokens, units = self.extractor.extract(text)
-        logger.debug(f"Extracted {len(units)} units")
 
         if not units:
-            logger.debug("No units found, returning original text")
             return text
 
-        translated_units = self._translate_units(
-            units=units,
-            src_lang=src_lang,
-            tgt_lang=tgt_lang,
-        )
+        translated_units = self._translate_units(units, src_lang, tgt_lang)
 
-        result = self.restorer.restore(tokens, translated_units)
-        logger.debug(f"Rendered result: {result!r}")
-        return result
+        self._apply_translations(tokens, translated_units)
+
+        html = self._render_html(tokens)
+
+        return self._html_to_markdown(html)
 
     def _translate_units(
         self,
@@ -43,31 +40,17 @@ class MarkdownTranslator:
         src_lang: str,
         tgt_lang: str,
     ) -> list[TranslationUnit]:
-        translated_units: list[TranslationUnit] = []
+
+        result: list[TranslationUnit] = []
 
         for unit in units:
-            logger.debug(f"Translating unit {unit.id}: segments from {unit.text!r}")
-
-            def make_translate_fn(sl: str, tl: str):
-                """Замыкание, чтобы не захватить переменные цикла."""
-
-                def fn(text: str) -> str:
-                    return self.translator.translate(
-                        text=text,
-                        src_lang=sl,
-                        tgt_lang=tl,
-                    )
-
-                return fn
-
-            translated_text = render_segments(
-                segments=unit.metadata.get("segments", []),
-                translate_fn=make_translate_fn(src_lang, tgt_lang),
+            translated_text = self.translator.translate(
+                text=unit.text,
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
             )
 
-            logger.debug(f"Translated unit {unit.id}: {translated_text!r}")
-
-            translated_units.append(
+            result.append(
                 TranslationUnit(
                     id=unit.id,
                     type=unit.type,
@@ -78,4 +61,38 @@ class MarkdownTranslator:
                 )
             )
 
-        return translated_units
+        return result
+
+    @staticmethod
+    def _apply_translations(tokens: list, units: list[TranslationUnit]) -> None:
+        mapping = {u.inline_token_index: u.text for u in units}
+
+        for i, token in enumerate(tokens):
+            if token.type == "inline" and i in mapping:
+                token.content = mapping[i]
+
+    def _render_html(self, tokens: list) -> str:
+        from markdown_it import MarkdownIt
+
+        md = MarkdownIt("commonmark", {"html": False})
+        return md.renderer.render(tokens, md.options, {})
+
+    def _html_to_markdown(self, html: str) -> str:
+        """
+        Pandoc fallback strategy:
+        - if pandoc exists → good markdown
+        - if not → return HTML (safe fallback)
+        """
+
+        if self.pandoc_available:
+            try:
+                return pypandoc.convert_text(
+                    html,
+                    to="markdown",
+                    format="html",
+                )
+            except Exception as e:
+                logger.warning(f"Pandoc failed, fallback to HTML: {e}")
+                return html
+
+        return html

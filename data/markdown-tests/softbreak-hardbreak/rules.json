@@ -1,0 +1,6 @@
+{
+  "preserve_softbreaks": true,
+  "preserve_hardbreaks": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

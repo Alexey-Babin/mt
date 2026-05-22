@@ -10,6 +10,7 @@ dependencies = [
     "markdown-it-py>=4.2.0",
     "mdit-py-plugins>=0.6.1",
     "pydantic>=2.13.4",
+    "pypandoc>=1.17",
     "pysbd>=0.3.4",
     "regex>=2026.5.9",
     "torch>=2.12.0",

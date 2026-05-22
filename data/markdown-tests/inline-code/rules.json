@@ -1,0 +1,6 @@
+{
+  "preserve_inline_code": true,
+  "preserve_formatting": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

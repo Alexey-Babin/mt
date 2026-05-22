@@ -1,0 +1,7 @@
+{
+  "preserve_list_structure": true,
+  "preserve_list_nesting": true,
+  "preserve_ordered_lists": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

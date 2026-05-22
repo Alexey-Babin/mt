@@ -1,0 +1,5 @@
+{
+  "support_rtl": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

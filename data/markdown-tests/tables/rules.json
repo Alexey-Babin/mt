@@ -1,0 +1,8 @@
+{
+"preserve_tables": true,
+"preserve_table_dimensions": true,
+"preserve_inline_code": true,
+"preserve_links": true,
+"compare_ast_structure": true,
+"strict_text_equality": false
+}

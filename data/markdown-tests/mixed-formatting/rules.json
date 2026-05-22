@@ -1,0 +1,7 @@
+{
+  "preserve_formatting": true,
+  "preserve_links": true,
+  "preserve_nested_emphasis": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}
