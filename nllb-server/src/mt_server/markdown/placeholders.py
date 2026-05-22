@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
+
 from markdown_it.token import Token
 
 from mt_server.markdown.units import Placeholder
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class PlaceholderRegistry:
@@ -10,27 +15,32 @@ class PlaceholderRegistry:
         self._counter = 0
 
     def next(self, prefix: str = "x") -> str:
-        value = f"<{prefix}{self._counter}/>"
+        value = f"\x02{prefix}{self._counter}\x03"
         self._counter += 1
         return value
 
 
-INLINE_CODE_TOKEN_TYPES = {
-    "code_inline",
-}
+@dataclass
+class SpanMarker:
+    """Маркер открывающего/закрывающего тега форматирования"""
 
-
-LINK_OPEN_TOKEN_TYPES = {
-    "link_open",
-}
-
-
-IMAGE_TOKEN_TYPES = {
-    "image",
-}
+    placeholder: str  # ключ-заменитель, вставленный в текст
+    open_tag: str  # исходный открывающий тег, напр. "**"
+    close_tag: str  # исходный закрывающий тег, напр. "**"
+    is_open: bool  # это открывающий или закрывающий маркер
 
 
 class InlinePlaceholderExtractor:
+    """
+    Извлекает текст из inline-токена, заменяя:
+    - inline-код          → placeholder  (вид: \x02codeN\x03)
+    - форматирование      → placeholder  (вид: \x02fmtN\x03)
+    - ссылки/изображения  → сохраняются как placeholder
+
+    Переводчику уходит чистый текст с нейтральными маркерами.
+    После перевода MarkdownRestorer восстанавливает исходные теги.
+    """
+
     def __init__(self):
         self.registry = PlaceholderRegistry()
 
@@ -40,86 +50,143 @@ class InlinePlaceholderExtractor:
 
         children = inline_token.children or []
 
-        i = 0
-        while i < len(children):
-            token = children[i]
+        logger.debug(f"Processing inline token with {len(children)} children")
+
+        # Стек открытых span-маркеров: (placeholder_key, open_tag, close_tag)
+        open_stack: list[tuple[str, str, str]] = []
+
+        for token in children:
+            logger.debug(
+                f"  Child token: type={token.type!r}, content={token.content!r}"
+            )
 
             match token.type:
-                case "text":
+                case "text" | "html_inline":
                     result.append(token.content)
-                    i += 1
 
+                # ── жирный ──────────────────────────────────────────────────
                 case "strong_open":
-                    result.append("**")
-                    i += 1
+                    key = self.registry.next("fmt")
+                    open_stack.append((key, "**", "**"))
+                    placeholders.append(
+                        Placeholder(key=key, kind="fmt_open", value="**")
+                    )
+                    result.append(key)
 
                 case "strong_close":
-                    result.append("**")
-                    i += 1
+                    if open_stack:
+                        open_key, open_tag, close_tag = open_stack.pop()
+                        key = self.registry.next("fmt")
+                        placeholders.append(
+                            Placeholder(
+                                key=key,
+                                kind="fmt_close",
+                                value={"open_key": open_key, "tag": close_tag},
+                            )
+                        )
+                        result.append(key)
 
+                # ── курсив ───────────────────────────────────────────────────
                 case "em_open":
-                    result.append("*")
-                    i += 1
+                    key = self.registry.next("fmt")
+                    open_stack.append((key, "*", "*"))
+                    placeholders.append(
+                        Placeholder(key=key, kind="fmt_open", value="*")
+                    )
+                    result.append(key)
 
                 case "em_close":
-                    result.append("*")
-                    i += 1
+                    if open_stack:
+                        open_key, open_tag, close_tag = open_stack.pop()
+                        key = self.registry.next("fmt")
+                        placeholders.append(
+                            Placeholder(
+                                key=key,
+                                kind="fmt_close",
+                                value={"open_key": open_key, "tag": close_tag},
+                            )
+                        )
+                        result.append(key)
 
+                # ── зачёркивание (~~) ────────────────────────────────────────
+                case "s_open" | "del_open":
+                    key = self.registry.next("fmt")
+                    open_stack.append((key, "~~", "~~"))
+                    placeholders.append(
+                        Placeholder(key=key, kind="fmt_open", value="~~")
+                    )
+                    result.append(key)
+
+                case "s_close" | "del_close":
+                    if open_stack:
+                        open_key, open_tag, close_tag = open_stack.pop()
+                        key = self.registry.next("fmt")
+                        placeholders.append(
+                            Placeholder(
+                                key=key,
+                                kind="fmt_close",
+                                value={"open_key": open_key, "tag": close_tag},
+                            )
+                        )
+                        result.append(key)
+
+                # ── inline-код ───────────────────────────────────────────────
                 case "code_inline":
-                    placeholder = self.registry.next("code")
+                    key = self.registry.next("code")
                     placeholders.append(
-                        Placeholder(
-                            key=placeholder,
-                            kind="inline_code",
-                            value=token.content,
-                        )
+                        Placeholder(key=key, kind="inline_code", value=token.content)
                     )
-                    result.append(placeholder)
-                    i += 1
+                    result.append(key)
 
+                # ── ссылка ───────────────────────────────────────────────────
                 case "link_open":
-                    href = token.attrGet("href")
-                    placeholder = self.registry.next("link")
+                    href = token.attrGet("href") or ""
+                    title = token.attrGet("title") or ""
+                    key = self.registry.next("lnk")
                     placeholders.append(
                         Placeholder(
-                            key=placeholder,
-                            kind="link_href",
-                            value=href,
+                            key=key,
+                            kind="link_open",
+                            value={"href": href, "title": title},
                         )
                     )
-                    result.append(f"[{placeholder}")
+                    result.append(key)
 
-                    # Найдём соответствующий link_close и текст между ними
-                    text_content = []
-                    j = i + 1
-                    while j < len(children) and children[j].type != "link_close":
-                        if children[j].type == "text":
-                            text_content.append(children[j].content)
-                        j += 1
+                case "link_close":
+                    key = self.registry.next("lnk")
+                    placeholders.append(
+                        Placeholder(key=key, kind="link_close", value=None)
+                    )
+                    result.append(key)
 
-                    if text_content:
-                        result.append("".join(text_content))
-
-                    result.append("]")
-                    i = j + 1 if j < len(children) else i + 1
-
+                # ── изображение ──────────────────────────────────────────────
                 case "image":
-                    src = token.attrGet("src")
+                    src = token.attrGet("src") or ""
                     alt = token.content or ""
-                    placeholder = self.registry.next("img")
+                    key = self.registry.next("img")
                     placeholders.append(
                         Placeholder(
-                            key=placeholder,
-                            kind="image_src",
-                            value=src,
+                            key=key, kind="image", value={"src": src, "alt": alt}
                         )
                     )
-                    result.append(f"![{alt}]({placeholder})")
-                    i += 1
+                    result.append(key)
+
+                # ── мягкий / жёсткий перенос строки ─────────────────────────
+                case "softbreak":
+                    result.append(" ")
+
+                case "hardbreak":
+                    key = self.registry.next("br")
+                    placeholders.append(
+                        Placeholder(key=key, kind="hardbreak", value=None)
+                    )
+                    result.append(key)
 
                 case _:
                     if token.content:
                         result.append(token.content)
-                    i += 1
 
-        return "".join(result).strip(), placeholders
+        final_text = "".join(result).strip()
+        logger.debug(f"Final extracted text: {final_text!r}")
+
+        return final_text, placeholders
