@@ -30,14 +30,6 @@ IMAGE_TOKEN_TYPES = {
 }
 
 
-FORMATTING_TOKEN_TYPES = {
-    "strong_open",
-    "strong_close",
-    "em_open",
-    "em_close",
-}
-
-
 class InlinePlaceholderExtractor:
     def __init__(self):
         self.registry = PlaceholderRegistry()
@@ -48,26 +40,33 @@ class InlinePlaceholderExtractor:
 
         children = inline_token.children or []
 
-        for token in children:
+        i = 0
+        while i < len(children):
+            token = children[i]
+
             match token.type:
                 case "text":
                     result.append(token.content)
+                    i += 1
 
                 case "strong_open":
-                    result.append("<b>")
+                    result.append("**")
+                    i += 1
 
                 case "strong_close":
-                    result.append("</b>")
+                    result.append("**")
+                    i += 1
 
                 case "em_open":
-                    result.append("<i>")
+                    result.append("*")
+                    i += 1
 
                 case "em_close":
-                    result.append("</i>")
+                    result.append("*")
+                    i += 1
 
                 case "code_inline":
                     placeholder = self.registry.next("code")
-
                     placeholders.append(
                         Placeholder(
                             key=placeholder,
@@ -75,14 +74,12 @@ class InlinePlaceholderExtractor:
                             value=token.content,
                         )
                     )
-
                     result.append(placeholder)
+                    i += 1
 
                 case "link_open":
                     href = token.attrGet("href")
-
                     placeholder = self.registry.next("link")
-
                     placeholders.append(
                         Placeholder(
                             key=placeholder,
@@ -90,18 +87,26 @@ class InlinePlaceholderExtractor:
                             value=href,
                         )
                     )
+                    result.append(f"[{placeholder}")
 
-                    result.append(placeholder)
+                    # Найдём соответствующий link_close и текст между ними
+                    text_content = []
+                    j = i + 1
+                    while j < len(children) and children[j].type != "link_close":
+                        if children[j].type == "text":
+                            text_content.append(children[j].content)
+                        j += 1
 
-                case "link_close":
-                    result.append("</link>")
+                    if text_content:
+                        result.append("".join(text_content))
+
+                    result.append("]")
+                    i = j + 1 if j < len(children) else i + 1
 
                 case "image":
                     src = token.attrGet("src")
                     alt = token.content or ""
-
                     placeholder = self.registry.next("img")
-
                     placeholders.append(
                         Placeholder(
                             key=placeholder,
@@ -109,11 +114,12 @@ class InlinePlaceholderExtractor:
                             value=src,
                         )
                     )
-
-                    result.append(f"{placeholder}{alt}")
+                    result.append(f"![{alt}]({placeholder})")
+                    i += 1
 
                 case _:
                     if token.content:
                         result.append(token.content)
+                    i += 1
 
         return "".join(result).strip(), placeholders

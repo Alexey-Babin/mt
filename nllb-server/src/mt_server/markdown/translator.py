@@ -20,6 +20,10 @@ class MarkdownTranslator:
     ) -> str:
         tokens, units = self.extractor.extract(text)
 
+        if not units:
+            # если по результатам разбора нет юнитов для перевода, возвращаем исходный текст
+            return text
+
         translated_units = self._translate_units(
             units=units,
             src_lang=src_lang,
@@ -48,8 +52,15 @@ class MarkdownTranslator:
                 tgt_lang=tgt_lang,
             )
 
-            unit.text = translated_text
-            translated_units.append(unit)
+            translated_unit = TranslationUnit(
+                id=unit.id,
+                type=unit.type,
+                text=translated_text,
+                inline_token_index=unit.inline_token_index,
+                placeholders=unit.placeholders,
+                metadata=unit.metadata,
+            )
+            translated_units.append(translated_unit)
 
         return translated_units
 

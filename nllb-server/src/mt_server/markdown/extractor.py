@@ -34,7 +34,6 @@ class MarkdownTranslationUnitExtractor:
 
     def extract(self, text: str) -> tuple[list[Token], list[TranslationUnit]]:
         tokens = self.parse(text)
-
         units: list[TranslationUnit] = []
 
         for ix, token in enumerate(tokens):
@@ -47,7 +46,7 @@ class MarkdownTranslationUnitExtractor:
 
             extracted_text, placeholders = self.placeholder_extractor.extract(token)
 
-            if not extracted_text.strip():
+            if not extracted_text.strip() and not placeholders:
                 continue
 
             units.append(
@@ -67,18 +66,24 @@ class MarkdownTranslationUnitExtractor:
         tokens: list[Token],
         inline_index: int,
     ) -> TranslationUnitType | None:
-        if inline_index == 0:
-            return None
+        # Пока не встретим parent, который не inline
+        for i in range(inline_index - 1, -1, -1):
+            parent = tokens[i]
 
-        parent = tokens[inline_index - 1]
+            if parent.type in TRANSLATABLE_INLINE_PARENTS:
+                return TRANSLATABLE_INLINE_PARENTS[parent.type]
 
-        if parent.type in TRANSLATABLE_INLINE_PARENTS:
-            return TRANSLATABLE_INLINE_PARENTS[parent.type]
+            if parent.type in LIST_ITEM_PARENTS:
+                return TranslationUnitType.LIST_ITEM
 
-        if parent.type in LIST_ITEM_PARENTS:
-            return TranslationUnitType.LIST_ITEM
+            if parent.type in TABLE_CELL_PARENTS:
+                return TranslationUnitType.TABLE_CELL
 
-        if parent.type in TABLE_CELL_PARENTS:
-            return TranslationUnitType.TABLE_CELL
+            # Если встретили блок, который не является parent для inline, прекращаем поиск (??)
+            if (
+                parent.type.endswith("_open")
+                and parent.type not in TRANSLATABLE_INLINE_PARENTS
+            ):
+                break
 
         return None
