@@ -3,5 +3,5 @@
 "preserve_fence_language": true,
 "preserve_code_exactly": true,
 "compare_ast_structure": true,
-"strict_text_equality": false
+"strict_text_equality": true
 }

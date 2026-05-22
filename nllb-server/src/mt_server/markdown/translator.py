@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 
 import pypandoc
@@ -8,6 +9,7 @@ import pypandoc
 from mt_server.markdown.extractor import MarkdownTranslationUnitExtractor
 from mt_server.markdown.units import TranslationUnit
 
+FRONTMATTER_RE = re.compile(r"^---\n.*?\n---\n", re.DOTALL)
 logger = logging.getLogger("uvicorn.error")
 
 
@@ -21,18 +23,30 @@ class MarkdownTranslator:
             logger.warning("Pandoc not found — fallback to HTML output")
 
     def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
-        tokens, units = self.extractor.extract(text)
+        frontmatter = ""
+
+        match = FRONTMATTER_RE.match(text)
+        if match:
+            frontmatter = match.group(0)
+            body = text[len(match.group(0)) :]
+        else:
+            body = text
+
+        tokens, units = self.extractor.extract(body)
 
         if not units:
             return text
 
         translated_units = self._translate_units(units, src_lang, tgt_lang)
-
         self._apply_translations(tokens, translated_units)
 
         html = self._render_html(tokens)
+        translated_body = self._html_to_markdown(html).lstrip("\n")
 
-        return self._html_to_markdown(html)
+        if frontmatter:
+            return frontmatter + translated_body
+
+        return translated_body
 
     def _translate_units(
         self,
