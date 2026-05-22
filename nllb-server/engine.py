@@ -4,6 +4,8 @@ from threading import Lock
 
 import torch
 from config import config
+from languages import LanguageRecord, languages_db
+from markdown_utils import detect_markdown, translate_markdown
 from transformers import AutoModelForSeq2SeqLM, NllbTokenizer
 from utils import split_into_chunks
 
@@ -16,6 +18,7 @@ class Translator:
         self._lock = Lock()
         self.model_name = path_to_model.split("/")[-1]
         self.model_path = path_to_model
+        self._languages: dict[str, LanguageRecord | None] | None = None
 
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Model not found at {self.model_path}")
@@ -39,6 +42,20 @@ class Translator:
         model.eval()
         self.model = model
 
+    @property
+    def languages(self) -> dict[str, LanguageRecord | None]:
+        """NLLB language codes enriched with display metadata from languages_db.
+
+        Returns a dict mapping each NLLB language code (e.g. ``"ace_Latn"``) to its
+        metadata record from ``languages.json``, or ``None`` if the code is unknown.
+        The result is computed once and cached.
+        """
+        if self._languages is None:
+            self._languages = {
+                code: languages_db.get(code) for code in self.get_supported_languages()
+            }
+        return self._languages
+
     def get_supported_languages(self):
         """Возвращает список языков, имеющихся в модели (только коды в формате nllb)"""
         langs = [
@@ -50,6 +67,26 @@ class Translator:
 
     @torch.inference_mode()
     def translate(self, text, src_lang, tgt_lang):
+        # Detect if input is markdown and use appropriate translation flow
+        if detect_markdown(text):
+            return self._translate_markdown(text, src_lang, tgt_lang)
+        else:
+            return self._translate_plain_text(text, src_lang, tgt_lang)
+
+    def _translate_markdown(self, text, src_lang, tgt_lang):
+        """Translate markdown text while preserving formatting."""
+        with self._lock:
+            self.tokenizer.src_lang = src_lang
+            return translate_markdown(
+                text=text,
+                tokenizer=self.tokenizer,
+                model=self.model,
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
+            )
+
+    def _translate_plain_text(self, text, src_lang, tgt_lang):
+        """Translate plain text using the original chunking approach."""
         chunks = split_into_chunks(
             tokenizer=self.tokenizer, text=text, nllb_lang_code=src_lang
         )
@@ -61,7 +98,6 @@ class Translator:
 
             for chunk in chunks:
                 inputs = self.tokenizer(
-                    # А точно ничего не потеряется? может, max_length вынести в параметры?
                     chunk.text,
                     return_tensors="pt",
                     truncation=True,

@@ -6,6 +6,9 @@ requires-python = ">=3.12"
 dependencies = [
     "accelerate>=1.13.0",
     "fastapi>=0.136.1",
+    "markdown-it-py>=3.0.0",
+    "mdformat>=1.0.0",
+    "mdit-py-plugins>=0.4.0",
     "pysbd>=0.3.4",
     "regex>=2026.5.9",
     "torch>=2.12.0",

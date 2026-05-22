@@ -1,11 +1,12 @@
 import logging
 import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from enum import StrEnum
 
 from config import config
 from engine import Translator
 from fastapi import FastAPI, Query
-from languages import languages_db
 from pydantic import BaseModel
 
 # Модель можно задать в переменной окружения
@@ -37,46 +38,34 @@ class LanguageLevels(StrEnum):
     NOT_MEMBER = "all"
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    # ── Startup ─────────────────────────────────────
+    app.state.translator = Translator(path_to_model=MODEL_PATH)
+
+    if not app.state.translator.has_cuda:
+        logger.warning("No CUDA device found")
+    logger.info(
+        f"Initialized translator with model {config.model_name} "
+        f"on device {app.state.translator.device}"
+    )
+
+    yield  # ── Application runs here ────────────────
+
+    # ── Shutdown ────────────────────────────────────
+    tr = app.state.translator
+    del tr.model
+    del tr.tokenizer
+
+    if tr.has_cuda:
+        import torch
+
+        torch.cuda.empty_cache()
+    logger.info("Translator released")
+
+
 def create_app():
-    app = FastAPI(title="NLLB Translation Server")
-
-    @app.on_event("startup")
-    async def startup():
-        tr = app.state.translator = Translator(path_to_model=MODEL_PATH)
-
-        # Получаем список возможных языков (сразу из модели)
-        model_lang_codes = tr.get_supported_languages()
-        app.state.languages = dict(
-            sorted(
-                [
-                    (lang_code, languages_db.get(lang_code))
-                    for lang_code in model_lang_codes
-                ],
-                key=lambda lang: (
-                    str(lang[1].get("ord", "1000")) + "_" + lang[1].get("ru")
-                    if lang[1] is not None
-                    else "9999999"
-                ),
-            )
-        )
-
-        if not tr.has_cuda:
-            logger.warning("No CUDA device found")
-        logger.info(
-            f"Initialized translator with model {config.model_name} on device {tr.device}"
-        )
-
-    @app.on_event("shutdown")
-    async def shutdown():
-        tr = app.state.translator
-        del tr.model
-        del tr.tokenizer
-
-        if tr.has_cuda:
-            import torch
-
-            torch.cuda.empty_cache()
-        logger.info("Translator released")
+    app = FastAPI(title="NLLB Translation Server", lifespan=lifespan)
 
     @app.get("/")
     async def root():
@@ -98,18 +87,27 @@ def create_app():
             LanguageLevels.MEMBERS_ONLY, description="Страны-члены, бывшие члены и все"
         ),
     ):
-
-        lang_list = {
-            lang[0]: lang[1]
-            for lang in app.state.languages.items()
-            if (
-                (language_level == "members_only" and lang[1].get("ord") < 10)
-                or (language_level == "former_members" and lang[1].get("ord") < 100)
+        # 1. Filter by membership level (skip codes without metadata)
+        filtered_langs = {
+            code: meta
+            for code, meta in app.state.translator.languages.items()
+            if meta is not None
+            and (
+                (language_level == "members_only" and meta.get("ord", 999) < 10)
+                or (language_level == "former_members" and meta.get("ord", 999) < 100)
                 or (language_level == "all")
             )
         }
 
-        return lang_list
+        # 2. Sort by country ordinal + Russian name
+        return dict(
+            sorted(
+                filtered_langs.items(),
+                key=lambda item: (
+                    str(item[1].get("ord", "1000")) + "_" + item[1].get("ru")
+                ),
+            )
+        )
 
     @app.post("/translate")
     async def translate(req: TranslationRequest):
