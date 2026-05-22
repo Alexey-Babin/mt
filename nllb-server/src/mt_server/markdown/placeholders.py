@@ -2,191 +2,168 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Protocol
 
 from markdown_it.token import Token
-
-from mt_server.markdown.units import Placeholder
 
 logger = logging.getLogger("uvicorn.error")
 
 
-class PlaceholderRegistry:
-    def __init__(self):
-        self._counter = 0
-
-    def next(self, prefix: str = "x") -> str:
-        value = f"\x02{prefix}{self._counter}\x03"
-        self._counter += 1
-        return value
+class TranslateFunc(Protocol):
+    def __call__(self, text: str) -> str: ...
 
 
 @dataclass
-class SpanMarker:
-    """Маркер открывающего/закрывающего тега форматирования"""
+class InlineSegment:
+    """Один сегмент inline-содержимого."""
 
-    placeholder: str  # ключ-заменитель, вставленный в текст
-    open_tag: str  # исходный открывающий тег, напр. "**"
-    close_tag: str  # исходный закрывающий тег, напр. "**"
-    is_open: bool  # это открывающий или закрывающий маркер
+    text: str  # текст для перевода (может быть пустым для нетекстовых сегментов)
+    translatable: bool  # нужно ли переводить
+    prefix: str = ""  # markdown-разметка до текста (напр. "**")
+    suffix: str = ""  # markdown-разметка после текста (напр. "**")
 
 
-class InlinePlaceholderExtractor:
+def _get_fmt_tags(token_type: str) -> tuple[str, str] | None:
+    """Возвращает (open_tag, close_tag) для форматирующих токенов."""
+    return {
+        "strong_open": ("**", "**"),
+        "em_open": ("*", "*"),
+        "s_open": ("~~", "~~"),
+        "del_open": ("~~", "~~"),
+    }.get(token_type)
+
+
+def extract_translatable_segments(
+    inline_token: Token,
+) -> list[InlineSegment]:
     """
-    Извлекает текст из inline-токена, заменяя:
-    - inline-код          → placeholder  (вид: \x02codeN\x03)
-    - форматирование      → placeholder  (вид: \x02fmtN\x03)
-    - ссылки/изображения  → сохраняются как placeholder
+    Разбирает inline-токен на сегменты.
 
-    Переводчику уходит чистый текст с нейтральными маркерами.
-    После перевода MarkdownRestorer восстанавливает исходные теги.
+    Текстовые сегменты помечаются translatable=True.
+    Форматирование (**, *, ~~) становится prefix/suffix соседнего текста.
+    Нетекстовые элементы (код, ссылки, изображения) — translatable=False.
     """
+    children = inline_token.children or []
+    segments: list[InlineSegment] = []
 
-    def __init__(self):
-        self.registry = PlaceholderRegistry()
+    # Стек открытых форматирующих тегов: (open_tag, close_tag)
+    fmt_stack: list[tuple[str, str]] = []
 
-    def extract(self, inline_token: Token) -> tuple[str, list[Placeholder]]:
-        placeholders: list[Placeholder] = []
-        result: list[str] = []
+    i = 0
+    while i < len(children):
+        token = children[i]
 
-        children = inline_token.children or []
-
-        logger.debug(f"Processing inline token with {len(children)} children")
-
-        # Стек открытых span-маркеров: (placeholder_key, open_tag, close_tag)
-        open_stack: list[tuple[str, str, str]] = []
-
-        for token in children:
-            logger.debug(
-                f"  Child token: type={token.type!r}, content={token.content!r}"
-            )
-
-            match token.type:
-                case "text" | "html_inline":
-                    result.append(token.content)
-
-                # ── жирный ──────────────────────────────────────────────────
-                case "strong_open":
-                    key = self.registry.next("fmt")
-                    open_stack.append((key, "**", "**"))
-                    placeholders.append(
-                        Placeholder(key=key, kind="fmt_open", value="**")
-                    )
-                    result.append(key)
-
-                case "strong_close":
-                    if open_stack:
-                        open_key, open_tag, close_tag = open_stack.pop()
-                        key = self.registry.next("fmt")
-                        placeholders.append(
-                            Placeholder(
-                                key=key,
-                                kind="fmt_close",
-                                value={"open_key": open_key, "tag": close_tag},
-                            )
-                        )
-                        result.append(key)
-
-                # ── курсив ───────────────────────────────────────────────────
-                case "em_open":
-                    key = self.registry.next("fmt")
-                    open_stack.append((key, "*", "*"))
-                    placeholders.append(
-                        Placeholder(key=key, kind="fmt_open", value="*")
-                    )
-                    result.append(key)
-
-                case "em_close":
-                    if open_stack:
-                        open_key, open_tag, close_tag = open_stack.pop()
-                        key = self.registry.next("fmt")
-                        placeholders.append(
-                            Placeholder(
-                                key=key,
-                                kind="fmt_close",
-                                value={"open_key": open_key, "tag": close_tag},
-                            )
-                        )
-                        result.append(key)
-
-                # ── зачёркивание (~~) ────────────────────────────────────────
-                case "s_open" | "del_open":
-                    key = self.registry.next("fmt")
-                    open_stack.append((key, "~~", "~~"))
-                    placeholders.append(
-                        Placeholder(key=key, kind="fmt_open", value="~~")
-                    )
-                    result.append(key)
-
-                case "s_close" | "del_close":
-                    if open_stack:
-                        open_key, open_tag, close_tag = open_stack.pop()
-                        key = self.registry.next("fmt")
-                        placeholders.append(
-                            Placeholder(
-                                key=key,
-                                kind="fmt_close",
-                                value={"open_key": open_key, "tag": close_tag},
-                            )
-                        )
-                        result.append(key)
-
-                # ── inline-код ───────────────────────────────────────────────
-                case "code_inline":
-                    key = self.registry.next("code")
-                    placeholders.append(
-                        Placeholder(key=key, kind="inline_code", value=token.content)
-                    )
-                    result.append(key)
-
-                # ── ссылка ───────────────────────────────────────────────────
-                case "link_open":
-                    href = token.attrGet("href") or ""
-                    title = token.attrGet("title") or ""
-                    key = self.registry.next("lnk")
-                    placeholders.append(
-                        Placeholder(
-                            key=key,
-                            kind="link_open",
-                            value={"href": href, "title": title},
+        match token.type:
+            # ── текст ────────────────────────────────────────────────────────
+            case "text":
+                text = token.content
+                if text.strip():
+                    # Собираем prefix из открытых форматов
+                    prefix = "".join(t[0] for t in fmt_stack)
+                    suffix = "".join(t[1] for t in reversed(fmt_stack))
+                    segments.append(
+                        InlineSegment(
+                            text=text,
+                            translatable=True,
+                            prefix=prefix,
+                            suffix=suffix,
                         )
                     )
-                    result.append(key)
+                    # После извлечения текста — форматирование "использовано"
+                    fmt_stack.clear()
 
-                case "link_close":
-                    key = self.registry.next("lnk")
-                    placeholders.append(
-                        Placeholder(key=key, kind="link_close", value=None)
+            # ── форматирование: открывающий тег ──────────────────────────────
+            case "strong_open" | "em_open" | "s_open" | "del_open":
+                tags = _get_fmt_tags(token.type)
+                if tags:
+                    fmt_stack.append(tags)
+
+            # ── форматирование: закрывающий тег — игнорируем, суффикс уже в сегменте
+            case "strong_close" | "em_close" | "s_close" | "del_close":
+                # Если стек не пуст, значит текст между тегами был пустым
+                if fmt_stack:
+                    fmt_stack.pop()
+
+            # ── inline-код ───────────────────────────────────────────────────
+            case "code_inline":
+                segments.append(
+                    InlineSegment(
+                        text=f"`{token.content}`",
+                        translatable=False,
                     )
-                    result.append(key)
+                )
+                fmt_stack.clear()
 
-                # ── изображение ──────────────────────────────────────────────
-                case "image":
-                    src = token.attrGet("src") or ""
-                    alt = token.content or ""
-                    key = self.registry.next("img")
-                    placeholders.append(
-                        Placeholder(
-                            key=key, kind="image", value={"src": src, "alt": alt}
-                        )
+            # ── ссылки ───────────────────────────────────────────────────────
+            case "link_open":
+                # Собираем всё содержимое ссылки до link_close
+                href = token.attrGet("href") or ""
+                title = token.attrGet("title") or ""
+                link_texts: list[str] = []
+                i += 1
+                while i < len(children) and children[i].type != "link_close":
+                    if children[i].type == "text":
+                        link_texts.append(children[i].content)
+                    i += 1
+                link_text = " ".join(link_texts)
+                if title:
+                    md = f'[{link_text}]({href} "{title}")'
+                else:
+                    md = f"[{link_text}]({href})"
+                segments.append(
+                    InlineSegment(
+                        text=md,
+                        translatable=False,
                     )
-                    result.append(key)
+                )
+                fmt_stack.clear()
 
-                # ── мягкий / жёсткий перенос строки ─────────────────────────
-                case "softbreak":
-                    result.append(" ")
-
-                case "hardbreak":
-                    key = self.registry.next("br")
-                    placeholders.append(
-                        Placeholder(key=key, kind="hardbreak", value=None)
+            # ── изображение ──────────────────────────────────────────────────
+            case "image":
+                src = token.attrGet("src") or ""
+                alt = token.content or ""
+                segments.append(
+                    InlineSegment(
+                        text=f"![{alt}]({src})",
+                        translatable=False,
                     )
-                    result.append(key)
+                )
+                fmt_stack.clear()
 
-                case _:
-                    if token.content:
-                        result.append(token.content)
+            # ── переносы ─────────────────────────────────────────────────────
+            case "softbreak":
+                segments.append(InlineSegment(text=" ", translatable=False))
 
-        final_text = "".join(result).strip()
-        logger.debug(f"Final extracted text: {final_text!r}")
+            case "hardbreak":
+                segments.append(InlineSegment(text="  \n", translatable=False))
 
-        return final_text, placeholders
+            case "html_inline":
+                segments.append(
+                    InlineSegment(
+                        text=token.content,
+                        translatable=False,
+                    )
+                )
+
+        i += 1
+
+    return segments
+
+
+def render_segments(
+    segments: list[InlineSegment],
+    translate_fn: TranslateFunc,
+) -> str:
+    """
+    Переводит каждый сегмент с translatable=True,
+    нетекстовые — оставляет как есть.
+    Возвращает итоговую строку.
+    """
+    parts: list[str] = []
+    for seg in segments:
+        if seg.translatable and seg.text.strip():
+            translated = translate_fn(seg.text)
+            parts.append(f"{seg.prefix}{translated}{seg.suffix}")
+        else:
+            parts.append(seg.text)
+    return "".join(parts)

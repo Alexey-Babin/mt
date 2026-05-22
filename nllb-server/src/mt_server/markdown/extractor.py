@@ -5,7 +5,7 @@ import logging
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
-from mt_server.markdown.placeholders import InlinePlaceholderExtractor
+from mt_server.markdown.placeholders import extract_translatable_segments
 from mt_server.markdown.units import TranslationUnit, TranslationUnitType
 
 logger = logging.getLogger("uvicorn.error")
@@ -16,20 +16,13 @@ TRANSLATABLE_INLINE_PARENTS = {
     "blockquote_open": TranslationUnitType.BLOCKQUOTE,
 }
 
-LIST_ITEM_PARENTS = {
-    "list_item_open",
-}
-
-TABLE_CELL_PARENTS = {
-    "td_open",
-    "th_open",
-}
+LIST_ITEM_PARENTS = {"list_item_open"}
+TABLE_CELL_PARENTS = {"td_open", "th_open"}
 
 
 class MarkdownTranslationUnitExtractor:
     def __init__(self):
         self.md = MarkdownIt("commonmark", {"html": False})
-        self.placeholder_extractor = InlinePlaceholderExtractor()
 
     def parse(self, text: str) -> list[Token]:
         return self.md.parse(text)
@@ -52,26 +45,30 @@ class MarkdownTranslationUnitExtractor:
             if parent_type is None:
                 continue
 
-            extracted_text, placeholders = self.placeholder_extractor.extract(token)
-            logger.debug(
-                f"  extracted_text={extracted_text!r}, placeholders={len(placeholders)}"
-            )
+            # Разбиваем на сегменты
+            segments = extract_translatable_segments(token)
+            logger.debug(f"  segments={[(s.text, s.translatable) for s in segments]}")
 
-            # Пропускаем пустые inline токены
-            if not extracted_text.strip() and not placeholders:
-                logger.debug("  skipping empty unit")
+            # Есть ли вообще что переводить?
+            has_translatable = any(s.translatable and s.text.strip() for s in segments)
+            if not has_translatable:
+                logger.debug("  no translatable segments, skipping")
                 continue
+
+            # Сохраняем исходный текст юнита для отладки
+            raw_text = token.content
 
             units.append(
                 TranslationUnit(
                     id=f"tu_{len(units)}",
                     type=parent_type,
-                    text=extracted_text if extracted_text else "",
+                    text=raw_text,
                     inline_token_index=ix,
-                    placeholders=placeholders,
+                    placeholders=[],  # больше не используем
+                    metadata={"segments": segments},
                 )
             )
-            logger.debug(f"  created unit with text={extracted_text!r}")
+            logger.debug(f"  created unit id=tu_{len(units) - 1}")
 
         return tokens, units
 
@@ -80,7 +77,6 @@ class MarkdownTranslationUnitExtractor:
         tokens: list[Token],
         inline_index: int,
     ) -> TranslationUnitType | None:
-        # Ищем parent, который не является inline
         for i in range(inline_index - 1, -1, -1):
             parent = tokens[i]
 
@@ -93,7 +89,6 @@ class MarkdownTranslationUnitExtractor:
             if parent.type in TABLE_CELL_PARENTS:
                 return TranslationUnitType.TABLE_CELL
 
-            # Если встретили блок, который не является parent для inline, прекращаем поиск
             if (
                 parent.type.endswith("_open")
                 and parent.type not in TRANSLATABLE_INLINE_PARENTS

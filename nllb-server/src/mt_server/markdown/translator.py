@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from mt_server.markdown.extractor import MarkdownTranslationUnitExtractor
+from mt_server.markdown.placeholders import render_segments
 from mt_server.markdown.restorer import MarkdownRestorer
 from mt_server.markdown.units import TranslationUnit
 
@@ -45,15 +46,26 @@ class MarkdownTranslator:
         translated_units: list[TranslationUnit] = []
 
         for unit in units:
-            logger.debug(f"Translating unit {unit.id}: {unit.text!r}")
+            logger.debug(f"Translating unit {unit.id}: segments from {unit.text!r}")
 
-            # Отправляем переводчику текст с нейтральными маркерами вместо md-тегов
-            translated_text = self.translator.translate(
-                text=unit.text,
-                src_lang=src_lang,
-                tgt_lang=tgt_lang,
+            def make_translate_fn(sl: str, tl: str):
+                """Замыкание, чтобы не захватить переменные цикла."""
+
+                def fn(text: str) -> str:
+                    return self.translator.translate(
+                        text=text,
+                        src_lang=sl,
+                        tgt_lang=tl,
+                    )
+
+                return fn
+
+            translated_text = render_segments(
+                segments=unit.metadata.get("segments", []),
+                translate_fn=make_translate_fn(src_lang, tgt_lang),
             )
-            logger.debug(f"Translated: {translated_text!r}")
+
+            logger.debug(f"Translated unit {unit.id}: {translated_text!r}")
 
             translated_units.append(
                 TranslationUnit(
