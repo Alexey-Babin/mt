@@ -6,7 +6,7 @@ from functools import lru_cache
 import pysbd
 import regex as re
 
-from mt_server.config import config
+from mt_server.config import settings
 from mt_server.languages import languages_db
 
 # Проверить на разных значениях. Возможно, вынести в параметры
@@ -74,7 +74,10 @@ def split_long_sentence(tokenizer, sentence: str, max_tokens: int) -> list[str]:
 
 
 def split_into_chunks(
-    tokenizer, text: str, nllb_lang_code: str, max_tokens: int = config.max_input_tokens
+    tokenizer,
+    text: str,
+    nllb_lang_code: str,
+    max_tokens: int = settings.max_input_tokens,
 ) -> list[TranslationChunk]:
     blocks = split_blocks(text)
     chunks: list[TranslationChunk] = []

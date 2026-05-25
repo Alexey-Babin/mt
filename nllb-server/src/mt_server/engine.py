@@ -5,18 +5,20 @@ from threading import Lock
 import torch
 from transformers import AutoModelForSeq2SeqLM, NllbTokenizer
 
-from mt_server.config import config
-from mt_server.utils import split_into_chunks
+from .config import settings
+from .languages import languages_db
+from .utils import split_into_chunks
 
-MODEL_COMPILE = config.model_compile
+MODEL_COMPILE = settings.model_compile
 LANG_PATTERN = re.compile(r"^[a-z]{3}_[A-Z][a-z]{3}$")
 
 
 class Translator:
-    def __init__(self, path_to_model):
+    def __init__(self, model_name):
+        # Модель можно задать в переменной окружения
+        self.model_path = os.path.join(settings.model_storage, model_name)
         self._lock = Lock()
-        self.model_name = path_to_model.split("/")[-1]
-        self.model_path = path_to_model
+        self.model_name = model_name
 
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Model not found at {self.model_path}")
@@ -39,6 +41,14 @@ class Translator:
         model.generation_config.max_length = None
         model.eval()
         self.model = model
+
+        # Поддерживаемые языки обогащаем из локальной БД
+        self.languages = dict(
+            [
+                (lang_code, languages_db.get(lang_code))
+                for lang_code in self.get_supported_languages()
+            ]
+        )
 
     def get_supported_languages(self):
         """Возвращает список языков, имеющихся в модели (только коды в формате nllb)"""
@@ -66,13 +76,13 @@ class Translator:
                     chunk.text,
                     return_tensors="pt",
                     truncation=True,
-                    max_length=config.tokenizer_max_length,
+                    max_length=settings.tokenizer_max_length,
                 ).to(self.device)
 
                 tokens = self.model.generate(
                     **inputs,
                     forced_bos_token_id=forced_bos_token_id,
-                    max_new_tokens=config.max_new_tokens,
+                    max_new_tokens=settings.max_new_tokens,
                     use_cache=True,
                 )
                 translated = self.tokenizer.batch_decode(

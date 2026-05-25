@@ -44,4 +44,4 @@ class MTConfig:
     )
 
 
-config = MTConfig()
+settings = MTConfig()

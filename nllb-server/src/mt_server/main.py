@@ -1,17 +1,16 @@
 import logging
 import os
+import sys
+from contextlib import asynccontextmanager
 from enum import StrEnum
+from typing import Optional
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
-from mt_server.config import config
-from mt_server.engine import Translator
-from mt_server.languages import languages_db
-from mt_server.translation_service import TextFormat, TranslationService
-
-# Модель можно задать в переменной окружения
-MODEL_PATH = os.path.join(config.model_storage, config.model_name)
+from .config import settings
+from .engine import Translator
+from .translation_service import TextFormat, TranslationService
 
 # Логирование
 logger = logging.getLogger("uvicorn.error")
@@ -23,15 +22,8 @@ DEBUG = os.environ.get("DEBUG", "0") == "1"
 if DEBUG:
     logger.setLevel(logging.DEBUG)
 
-logger.debug(f"Working with model {config.model_name}")
-logger.debug(f"{MODEL_PATH=}")
-
-
-class TranslationRequest(BaseModel):
-    text: str
-    src_lang: str
-    target_lang: str
-    format: TextFormat = TextFormat.AUTO
+logger.debug(f"Working with model {settings.model_name}")
+logger.debug(f"{settings.model_storage=}")
 
 
 class LanguageLevels(StrEnum):
@@ -40,96 +32,122 @@ class LanguageLevels(StrEnum):
     NOT_MEMBER = "all"
 
 
-def create_app():
-    app = FastAPI(title="NLLB Translation Server")
+# -------------------------------------------------------------
+# Глобальные зависимости
+translator_engine: Optional[Translator] = None
+translation_service: Optional[TranslationService] = None
 
-    @app.on_event("startup")
-    async def startup():
-        tr = app.state.translator = Translator(path_to_model=MODEL_PATH)
-        app.state.translation_service = TranslationService(translator=tr)
 
-        # Получаем список возможных языков (сразу из модели)
-        model_lang_codes = tr.get_supported_languages()
-        app.state.languages = dict(
-            sorted(
-                [
-                    (lang_code, languages_db.get(lang_code))
-                    for lang_code in model_lang_codes
-                ],
-                key=lambda lang: (
-                    str(lang[1].get("ord", "1000")) + "_" + lang[1].get("ru")
-                    if lang[1] is not None
-                    else "9999999"
-                ),
-            )
-        )
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Инициализация и shutdown приложения."""
+    # ---------------------STARTUP--------------------------------------
+    global translator_engine, translation_service
 
-        if not tr.has_cuda:
+    logger.info("Loading NLLB model...")
+    try:
+        # Инициализация тяжелого движка
+        translator_engine = Translator(model_name=settings.model_name)
+        # Инициализация сервиса (обертка над движком)
+        translation_service = TranslationService(translator_engine)
+        if not translator_engine.has_cuda:
             logger.warning("No CUDA device found")
         logger.info(
-            f"Initialized translator with model {config.model_name} on device {tr.device}"
+            f"Initialized translator with model {settings.model_name} on device {translator_engine.device}"
+        )
+    except Exception as e:
+        logger.error(f"Failed to load model: {e}")
+        sys.exit(1)
+    # ------------------------------------------------------------------
+    yield
+    # ---------------------SHUTDOWN-------------------------------------
+    logger.info("Shutting down...")
+    # Очистка ресурсов если нужна
+    translator_engine = None
+    translation_service = None
+
+
+app = FastAPI(title="NLLB Translation Server", lifespan=lifespan)
+
+
+class TranslateRequest(BaseModel):
+    text: str
+    src_lang: str
+    target_lang: str
+    format: TextFormat = TextFormat.AUTO
+
+
+class TranslateResponse(BaseModel):
+    translated_text: str
+    source_lang: str
+    target_lang: str
+
+
+@app.post("/translate", response_model=TranslateResponse)
+async def translate_endpoint(request: TranslateRequest):
+    if not request.text:
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    # # Валидация языков
+    # try:
+    #     validate_language_pair(request.source_lang, request.target_lang)
+    # except ValueError as e:
+    #     raise HTTPException(status_code=400, detail=str(e))
+
+    if translation_service is None:
+        raise HTTPException(status_code=503, detail="Translation service not ready")
+
+    try:
+        result = translation_service.translate(
+            text=request.text,
+            src_lang=request.src_lang,
+            tgt_lang=request.target_lang,
+            format=request.format,
         )
 
-    @app.on_event("shutdown")
-    async def shutdown():
-        tr = app.state.translator
-        del tr.model
-        del tr.tokenizer
+        return TranslateResponse(
+            translated_text=result,
+            source_lang=request.src_lang,
+            target_lang=request.target_lang,
+        )
+    except Exception as e:
+        logger.error(f"Endpoint error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal translation error")
 
-        if tr.has_cuda:
-            import torch
 
-            torch.cuda.empty_cache()
-        logger.info("Translator released")
+@app.get("/health")
+async def health_check():
 
-    @app.get("/")
-    async def root():
-        return "The server is up and running"
-
-    @app.get("/health")
-    def health():
-        tr = app.state.translator
+    if translator_engine and translation_service:
         return {
-            "status": "ok",
-            "gpu": tr.has_cuda,
-            "device": tr.device,
-            "model": tr.model_name,
+            "status": "ready",
+            "model": translator_engine.model_name,
+            "gpu": translator_engine.has_cuda,
+            "device": translator_engine.device,
         }
+    else:
+        return {"status": "loading"}
 
-    @app.get("/languages")
-    def get_languages(
-        language_level: LanguageLevels = Query(
-            LanguageLevels.MEMBERS_ONLY, description="Страны-члены, бывшие члены и все"
-        ),
-    ):
 
-        lang_list = {
-            lang[0]: lang[1]
-            for lang in app.state.languages.items()
-            if (
-                (language_level == "members_only" and lang[1].get("ord") < 10)
-                or (language_level == "former_members" and lang[1].get("ord") < 100)
-                or (language_level == "all")
-            )
-        }
+@app.get("/languages")
+def get_languages(
+    language_level: LanguageLevels = Query(
+        LanguageLevels.MEMBERS_ONLY, description="Страны-члены, бывшие члены и все"
+    ),
+):
 
-        return lang_list
-
-    @app.post("/translate")
-    async def translate(req: TranslationRequest):
-        service = app.state.translation_service
-        result = service.translate(
-            text=req.text,
-            src_lang=req.src_lang,
-            tgt_lang=req.target_lang,
-            format=req.format,
+    lang_list = {
+        lang[0]: lang[1]
+        for lang in translator_engine.languages.items()
+        if (
+            (language_level == "members_only" and lang[1].get("ord") < 10)
+            or (language_level == "former_members" and lang[1].get("ord") < 100)
+            or (language_level == "all")
         )
-        return {"translated_text": result}
+    }
 
-    return app
+    return lang_list
 
-
-app = create_app()
 
 if __name__ == "__main__":
     import uvicorn

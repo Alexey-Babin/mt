@@ -1,6 +1,15 @@
 from __future__ import annotations
 
+from enum import StrEnum
+
 import regex as re
+
+
+class TextFormat(StrEnum):
+    AUTO = "auto"
+    PLAIN = "plain"
+    MARKDOWN = "markdown"
+
 
 MARKDOWN_PATTERNS = [
     re.compile(r"```"),

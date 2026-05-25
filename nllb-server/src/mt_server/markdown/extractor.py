@@ -1,98 +1,89 @@
-from __future__ import annotations
+# src/mt_server/markdown/extractor.py
 
 import logging
+from typing import Any, Dict, List
 
-from markdown_it import MarkdownIt
-from markdown_it.token import Token
+from bs4 import BeautifulSoup
 
-from mt_server.markdown.placeholders import extract_translatable_segments
-from mt_server.markdown.units import TranslationUnit, TranslationUnitType
+from .units import MarkdownTranslationUnit
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 
-TRANSLATABLE_INLINE_PARENTS = {
-    "paragraph_open": TranslationUnitType.PARAGRAPH,
-    "heading_open": TranslationUnitType.HEADING,
-    "blockquote_open": TranslationUnitType.BLOCKQUOTE,
+# Теги, которые считаем "транслируемыми блоками"
+TRANSLATABLE_TAGS = {
+    "p",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "li",
+    "td",
+    "th",
+    "blockquote",
+    "figcaption",
 }
-
-LIST_ITEM_PARENTS = {"list_item_open"}
-TABLE_CELL_PARENTS = {"td_open", "th_open"}
+# Теги, которые игнорируем (код, навигация, метаданные)
+IGNORE_TAGS = {"pre", "code", "script", "style", "img", "br", "hr"}
 
 
 class MarkdownTranslationUnitExtractor:
-    def __init__(self):
-        self.md = MarkdownIt("commonmark", {"html": False})
+    """
+    Извлекает единицы перевода из HTML-представления Markdown.
+    Работает на уровне блочных элементов.
+    """
 
-    def parse(self, text: str) -> list[Token]:
-        return self.md.parse(text)
+    def extract(self, tokens: List[Dict[str, Any]]) -> List[MarkdownTranslationUnit]:
+        """
+        Принимает список токенов (HTML-блоки), возвращает список юнитов.
 
-    def extract(self, text: str) -> tuple[list[Token], list[TranslationUnit]]:
-        tokens = self.parse(text)
-        units: list[TranslationUnit] = []
+        Ожидается, что каждый токен имеет структуру:
+        {"type": "Tag", "tag": "p", "content": "<p>Text <b>bold</b></p>"}
+        """
+        units = []
 
-        logger.debug(f"Total tokens: {len(tokens)}")
+        for idx, token in enumerate(tokens):
+            tag_name = token.get("tag", "").lower()
+            content = token.get("content", "")
 
-        for ix, token in enumerate(tokens):
-            logger.debug(f"Token {ix}: type={token.type}, content={token.content!r}")
-
-            if token.type != "inline":
+            if not content or not tag_name:
                 continue
 
-            parent_type = self._detect_parent_type(tokens, ix)
-            logger.debug(f"  parent_type={parent_type}")
-
-            if parent_type is None:
+            if tag_name in IGNORE_TAGS:
+                logger.debug(f"Skipping non-translatable block: {tag_name}")
                 continue
 
-            # Разбиваем на сегменты
-            segments = extract_translatable_segments(token)
-            logger.debug(f"  segments={[(s.text, s.translatable) for s in segments]}")
+            if tag_name not in TRANSLATABLE_TAGS:
+                # Если тег неизвестен, пробуем извлечь текст, но с осторожностью
+                logger.debug(f"Unknown tag {tag_name}, attempting extraction.")
 
-            # Есть ли вообще что переводить?
-            has_translatable = any(s.translatable and s.text.strip() for s in segments)
-            if not has_translatable:
-                logger.debug("  no translatable segments, skipping")
-                continue
+            try:
+                # Парсим контент токена чтобы получить чистый текст
+                soup = BeautifulSoup(content, "html.parser")
+                text_content = soup.get_text(separator=" ", strip=True)
 
-            # Сохраняем исходный текст юнита для отладки
-            raw_text = token.content
+                if not text_content:
+                    continue
 
-            units.append(
-                TranslationUnit(
-                    id=f"tu_{len(units)}",
-                    type=parent_type,
-                    text=raw_text,
-                    inline_token_index=ix,
-                    placeholders=[],  # больше не используем
-                    metadata={"segments": segments},
+                unit = MarkdownTranslationUnit(
+                    id=f"unit_{idx}_{tag_name}",
+                    text=text_content,
+                    metadata={
+                        "token_index": idx,
+                        "tag": tag_name,
+                        "original_html": content,
+                    },
                 )
-            )
-            logger.debug(f"  created unit id=tu_{len(units) - 1}")
+                units.append(unit)
 
-        return tokens, units
+            except Exception as e:
+                logger.error(
+                    f"Failed to extract text from token {idx} ({tag_name}): {e}"
+                )
+                continue
 
-    @staticmethod
-    def _detect_parent_type(
-        tokens: list[Token],
-        inline_index: int,
-    ) -> TranslationUnitType | None:
-        for i in range(inline_index - 1, -1, -1):
-            parent = tokens[i]
-
-            if parent.type in TRANSLATABLE_INLINE_PARENTS:
-                return TRANSLATABLE_INLINE_PARENTS[parent.type]
-
-            if parent.type in LIST_ITEM_PARENTS:
-                return TranslationUnitType.LIST_ITEM
-
-            if parent.type in TABLE_CELL_PARENTS:
-                return TranslationUnitType.TABLE_CELL
-
-            if (
-                parent.type.endswith("_open")
-                and parent.type not in TRANSLATABLE_INLINE_PARENTS
-            ):
-                return None
-
-        return None
+        logger.info(
+            f"Extracted {len(units)} translation units from {len(tokens)} tokens."
+        )
+        return units
