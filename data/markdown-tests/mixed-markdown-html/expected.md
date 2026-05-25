@@ -1,3 +1,3 @@
-**жирный <span>html</span> текст**
+**смелый <span>html</span> текст**
 
 - элемент <b>html</b>

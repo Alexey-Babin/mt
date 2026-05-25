@@ -1,0 +1,6 @@
+{
+  "preserve_code_blocks": true,
+  "translate_code_comments": true,
+  "translate_strings_in_code": false,
+  "preserve_language_identifier": true
+}

@@ -1,13 +1,46 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
-build/
+*.pyd
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# Build artifacts
 dist/
+build/
 wheels/
 *.egg-info
+target/
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
 
-# Virtual environments
-.venv
+# Dependencies
+node_modules/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.npm/
+.yarn/
+
+# System files
+.DS_Store
+
+# Hugging Face models
 models
 
 project-files-content.txt

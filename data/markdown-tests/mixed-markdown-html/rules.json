@@ -1,5 +1,5 @@
 {
-  "preserve_mixed_content": true,
-  "compare_ast_structure": true,
+  "preserve_html_tags": true,
+  "translate_text_content": true,
   "strict_text_equality": false
 }

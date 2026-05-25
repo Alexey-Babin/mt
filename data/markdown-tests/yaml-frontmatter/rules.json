@@ -1,5 +1,5 @@
 {
-  "preserve_frontmatter": true,
-  "compare_ast_structure": true,
-  "strict_text_equality": false
+  "parse_yaml_frontmatter": true,
+  "translate_yaml_values": true,
+  "preserve_yaml_structure": true
 }
