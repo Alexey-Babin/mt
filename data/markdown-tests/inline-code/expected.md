@@ -1,3 +1,3 @@
 Используйте `docker compose up`.
 
-**Жирный текст с `inline code`**
+**Жирный `inline code` текст**

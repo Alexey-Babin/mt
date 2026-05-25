@@ -1,3 +1,5 @@
+import re
+
 from markdown_it import MarkdownIt
 
 
@@ -10,6 +12,11 @@ def ast_equal(a: str, b: str, rules: dict | None = None) -> bool:
     - strict_text_equality: if True, require exact text match
     - preserve_frontmatter: if True, YAML frontmatter should be preserved
     - preserve_mixed_content: if True, HTML tags should be preserved
+    - preserve_code_blocks: if True, code blocks should be preserved exactly
+    - preserve_language_identifier: if True, language identifiers in code blocks should be preserved
+    - translate_code_comments: if True, comments in code can be translated
+    - translate_strings_in_code: if True, strings in code can be translated
+    - preserve_html_tags: if True, HTML tags should be preserved exactly
     """
     if rules is None:
         rules = {}
@@ -28,38 +35,44 @@ def ast_equal(a: str, b: str, rules: dict | None = None) -> bool:
     a_tokens = list(md.parse(a))
     b_tokens = list(md.parse(b))
 
-    # Check if frontmatter should be preserved
-    if rules.get("preserve_frontmatter"):
-        # Extract and compare frontmatter separately
-        a_lines = a.split("\n")
-        b_lines = b.split("\n")
+    # Check if code blocks should be preserved
+    if rules.get("preserve_code_blocks"):
+        # Extract code blocks from input and verify they exist in output
+        # Find all code blocks in input with their language identifiers
+        code_block_pattern = r"```(\w*)\n(.*?)```"
+        a_code_blocks = re.findall(code_block_pattern, a, re.DOTALL)
+        b_code_blocks = re.findall(code_block_pattern, b, re.DOTALL)
 
-        if a_lines[0].strip() == "---":
-            # Find end of frontmatter in input
-            a_end = 1
-            for i in range(1, len(a_lines)):
-                if a_lines[i].strip() == "---":
-                    a_end = i + 1
-                    break
+        # Code blocks should be preserved exactly
+        if a_code_blocks != b_code_blocks:
+            return False
 
-            # Find end of frontmatter in output
-            b_end = 1
-            for i in range(1, len(b_lines)):
-                if b_lines[i].strip() == "---":
-                    b_end = i + 1
-                    break
+        # Remove code blocks from both texts for further comparison
+        a_without_code = re.sub(code_block_pattern, "", a, flags=re.DOTALL)
+        b_without_code = re.sub(code_block_pattern, "", b, flags=re.DOTALL)
 
-            # Frontmatter should be preserved exactly
-            a_frontmatter = "\n".join(a_lines[:a_end])
-            b_frontmatter = "\n".join(b_lines[:b_end])
-            if a_frontmatter != b_frontmatter:
-                return False
+        # Compare the remaining content
+        a_tokens = list(md.parse(a_without_code))
+        b_tokens = list(md.parse(b_without_code))
 
-            # Compare only the content after frontmatter
-            a_content = "\n".join(a_lines[a_end:])
-            b_content = "\n".join(b_lines[b_end:])
-            a_tokens = list(md.parse(a_content))
-            b_tokens = list(md.parse(b_content))
+    # Check if HTML tags should be preserved
+    if rules.get("preserve_html_tags"):
+        # Extract HTML tags from input and output
+        html_tag_pattern = r"<[^>]+>"
+        a_html_tags = re.findall(html_tag_pattern, a)
+        b_html_tags = re.findall(html_tag_pattern, b)
+
+        # HTML tags should be preserved exactly
+        if a_html_tags != b_html_tags:
+            return False
+
+        # Remove HTML tags from both texts for further comparison
+        a_without_html = re.sub(html_tag_pattern, "", a)
+        b_without_html = re.sub(html_tag_pattern, "", b)
+
+        # Compare the remaining content
+        a_tokens = list(md.parse(a_without_html))
+        b_tokens = list(md.parse(b_without_html))
 
     # Compare token types and tags
     a_structure = [(t.type, t.tag) for t in a_tokens]

@@ -9,6 +9,4 @@ cases = load_cases()
 @pytest.mark.parametrize("case", cases, ids=lambda c: c["name"])
 def test_markdown(case):
     output = run_translation(case["input"])
-
-    # assert ast_equal(case["input"], output)
-    assert ast_equal(case["input"], output, case.get("rules", {}))
+    assert ast_equal(case["expected"], output, case.get("rules", {}))
