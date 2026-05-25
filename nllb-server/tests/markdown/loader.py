@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 
-BASE = Path("/opt/mt/data/markdown-tests")
+# BASE = Path("/opt/mt/data/markdown-tests")
+BASE = Path(__file__).parent.parent.parent.parent / "data" / "markdown-tests"
 
 
 def load_cases():

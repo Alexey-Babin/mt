@@ -10,4 +10,5 @@ cases = load_cases()
 def test_markdown(case):
     output = run_translation(case["input"])
 
-    assert ast_equal(case["input"], output)
+    # assert ast_equal(case["input"], output)
+    assert ast_equal(case["input"], output, case.get("rules", {}))
