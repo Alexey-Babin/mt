@@ -14,6 +14,7 @@ dependencies = [
     "mdformat>=1.0.0",
     "mdit-py-plugins>=0.6.1",
     "pydantic>=2.13.4",
+    "pymdown-extensions>=10.21.3",
     "pypandoc>=1.17",
     "pysbd>=0.3.4",
     "regex>=2026.5.9",

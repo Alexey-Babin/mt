@@ -9,7 +9,11 @@ import markdown
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
 
-from .extractor import TRANSLATABLE_TAGS, MarkdownTranslationUnitExtractor
+from .extractor import (
+    IGNORE_TAGS,
+    TRANSLATABLE_TAGS,
+    MarkdownTranslationUnitExtractor,
+)
 from .placeholders import translate_html_content
 from .units import MarkdownTranslationUnit
 
@@ -34,7 +38,7 @@ class MarkdownTranslator:
 
         # Настройка конвертеров
         self.md_converter = markdown.Markdown(
-            extensions=["tables", "fenced_code", "toc"]
+            extensions=["tables", "fenced_code", "toc", "pymdownx.tasklist"]
         )
         self.html_converter = html2text.HTML2Text()
         self.html_converter.ignore_links = False
@@ -150,6 +154,51 @@ class MarkdownTranslator:
                 # Не идем глубже, чтобы не дублировать контент (если внутри p есть b, мы берем весь p)
                 return
 
+            # Если это теги, которые нужно сохранить без изменений (код и т.д.)
+            if node.name in IGNORE_TAGS:
+                tokens.append(
+                    {
+                        "type": "Tag",
+                        "tag": node.name,
+                        "content": str(node),  # Сохраняем весь тег с содержимым
+                    }
+                )
+                return
+
+            # Если это контейнер списка (ul/ol), обрабатываем его целиком для сохранения структуры
+            if node.name in ["ul", "ol"]:
+                tokens.append(
+                    {
+                        "type": "Tag",
+                        "tag": node.name,
+                        "content": str(node),  # Сохраняем весь список целиком
+                    }
+                )
+                return
+
+            # Если это li с вложенным списком, тоже сохраняем целиком
+            if node.name == "li":
+                has_nested_list = any(
+                    child.name in ["ul", "ol"]
+                    for child in node.children
+                    if hasattr(child, "name")
+                )
+                if has_nested_list:
+                    tokens.append(
+                        {
+                            "type": "Tag",
+                            "tag": node.name,
+                            "content": str(
+                                node
+                            ),  # Сохраняем весь li с вложенным списком
+                        }
+                    )
+                    return
+                # Если нет вложенного списка, идём внутрь
+                for child in node.children:
+                    traverse(child)
+                return
+
             # Если это контейнер (div, section, body), идем внутрь
             if node.name in [
                 "div",
@@ -158,7 +207,6 @@ class MarkdownTranslator:
                 "body",
                 "td",
                 "th",
-                "li",
                 "blockquote",
             ]:
                 for child in node.children:
@@ -201,11 +249,107 @@ class MarkdownTranslator:
         if not html.strip():
             return ""
         try:
+            # Создаём кастомный конвертер с поддержкой сохранения inline-тегов
+            html_converter = html2text.HTML2Text()
+            html_converter.ignore_links = False
+            html_converter.ignore_images = False
+            html_converter.body_width = 0  # Отключаем перенос строк
+            html_converter.ul_item_mark = "-"
+
+            # Callback для сохранения инлайн-тегов (span, font, mark, и т.д.)
+            def preserve_inline_tags(h2t, tag, attrs, start):
+                inline_tags_to_preserve = {
+                    "span",
+                    "font",
+                    "mark",
+                    "small",
+                    "sub",
+                    "sup",
+                    "b",
+                    "i",
+                    "u",
+                    "s",
+                    "strike",
+                }
+
+                # Обработка чекбоксов из task list
+                if tag == "input" and attrs.get("type") == "checkbox":
+                    if start:
+                        checked = (
+                            "checked" in attrs or attrs.get("checked") == "checked"
+                        )
+                        h2t.o("[x] " if checked else "[ ] ")
+                        return True  # Остановить стандартную обработку
+                    return True  # Игнорируем закрывающий тег
+
+                # Обработка инлайн-тегов
+                if tag in inline_tags_to_preserve:
+                    if start:
+                        attr_str = ""
+                        for k, v in attrs.items():
+                            if v:
+                                attr_str += f' {k}="{v}"'
+                        h2t.o(f"<{tag}{attr_str}>")
+                    else:
+                        h2t.o(f"</{tag}>")
+                    return True  # Остановить стандартную обработку
+                return False  # Продолжить стандартную обработку
+
+            setattr(html_converter, "tag_callback", preserve_inline_tags)
+
             # Сохраняем пробелы - иначе побьётся разметка
-            # protected_html = re.sub(r" (?=[^>]*<|[^<>]*$)", "@", html)
             protected_html = re.sub(r" (?=[^>]*<(?:/?[a-zA-Z1-6]+|!))", "\x01", html)
 
-            md = self.html_converter.handle(protected_html)
+            # Сначала находим все <pre><code class="language-XXX">...</code></pre>
+            # и заменяем их на плейсхолдеры, чтобы html2text не трогал их содержимое
+            code_blocks = []
+
+            def save_code_block(match):
+                lang_class = match.group(1) or ""
+                code_content = match.group(2)
+                # Извлекаем язык из класса вида "language-python" -> "python"
+                lang = lang_class.replace("language-", "") if lang_class else ""
+                # Удаляем лишний начальный/конечный newline из контента
+                code_content = code_content.strip("\n")
+                # Сохраняем блок и возвращаем плейсхолдер
+                code_blocks.append(f"```{lang}\n{code_content}\n```")
+                return f"\x02CODEBLOCK{len(code_blocks) - 1}\x02"
+
+            # Находим все <pre><code class="language-XXX">...</code></pre>
+            protected_html = re.sub(
+                r'<pre><code(?:\s+class="([^"]*)")?>(.*?)</code></pre>',
+                save_code_block,
+                protected_html,
+                flags=re.DOTALL,
+            )
+
+            md = html_converter.handle(protected_html)
+
+            # Восстанавливаем code блоки из плейсхолдеров
+            for i, block in enumerate(code_blocks):
+                md = md.replace(f"\x02CODEBLOCK{i}\x02", block)
+
+            # Удаляем лишний пробел перед закрывающим тегом inline-элементов
+            # html2text добавляет пробел после открывающего тега при использовании tag_callback
+            md = re.sub(r"<(span|font|mark|small|sub|sup)([^>]*)>\s+", r"<\1\2>", md)
+
+            # Нормализуем отступы списков:
+            # html2text генерирует отступы с шагом 2 пробела, но начинает с 2 пробелов для первого уровня
+            # Ожидаемый формат: 0 пробелов для уровня 1, 2 пробела для уровня 2, 4 пробела для уровня 3 и т.д.
+            def normalize_list_indents(line):
+                # Находим количество начальных пробелов
+                match = re.match(r"^(\s*)([-*+]|\d+\.)\s", line)
+                if match:
+                    indent = match.group(1)
+                    # Убираем 2 начальных пробела (которые html2text добавляет для первого уровня)
+                    new_indent = max(0, len(indent) - 2)
+                    return " " * new_indent + line.lstrip()
+                return line
+
+            md_lines = md.split("\n")
+            normalized_lines = [normalize_list_indents(line) for line in md_lines]
+            md = "\n".join(normalized_lines)
+
             return md.replace("\x01", " ")
         except Exception as e:
             logger.error(f"HTML to Markdown conversion failed: {e}")
