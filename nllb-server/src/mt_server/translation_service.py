@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from .engine import Translator
+from .engine import TranslatorProtocol
 from .format_detection import TextFormat, looks_like_markdown
 from .markdown import MarkdownTranslator
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class TranslationService:
     """Служба перевода - определение формата входных данных, выбор специализированного переводчика"""
 
-    def __init__(self, engine: Translator):
+    def __init__(self, engine: TranslatorProtocol):
         self.engine = engine
         self.md_translator = MarkdownTranslator(engine)
 

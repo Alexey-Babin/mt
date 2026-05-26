@@ -1,6 +1,7 @@
 import os
 import re
 from threading import Lock
+from typing import Protocol
 
 import torch
 from transformers import AutoModelForSeq2SeqLM, NllbTokenizer
@@ -11,6 +12,24 @@ from .utils import split_into_chunks
 
 MODEL_COMPILE = settings.model_compile
 LANG_PATTERN = re.compile(r"^[a-z]{3}_[A-Z][a-z]{3}$")
+
+
+class TranslatorProtocol(Protocol):
+    """Protocol defining the interface for a translator."""
+
+    model_name: str
+    has_cuda: bool
+    device: str
+    tokenizer: object
+    languages: dict
+
+    def get_supported_languages(self) -> list[str]:
+        """Return list of supported language codes."""
+        ...
+
+    def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
+        """Translate text from source language to target language."""
+        ...
 
 
 class Translator:

@@ -50,8 +50,8 @@ def translate_html_content(
             return
 
         if isinstance(node, NavigableString):
-            text = str(node).strip()
-            if not text:
+            text = str(node)
+            if not text.strip():
                 return
 
             # Не переводим, если это просто пробелы между тегами
