@@ -10,8 +10,11 @@ if USE_MOCK:
 else:
     from mt_server.engine import Translator
 
+print(f"{USE_MOCK=}")
+
 
 def run_translation(text: str) -> str:
+
     if USE_MOCK:
         translator = Translator("")
     else:

@@ -39,6 +39,9 @@ class MarkdownTranslator:
         self.html_converter.ignore_links = False
         self.html_converter.ignore_images = False
         self.html_converter.body_width = 0  # Отключаем перенос строк
+        # self.html_converter.escape_snob = (
+        #     True  # Не конвертировать <b>, <i>, <span> и т.д. в markdown
+        # )
 
     def translate(self, markdown_text: str, src_lang: str, tgt_lang: str) -> str:
         if not markdown_text or not markdown_text.strip():
