@@ -90,9 +90,10 @@ class Translator:
             forced_bos_token_id = self.tokenizer.convert_tokens_to_ids(tgt_lang)
 
             for chunk in chunks:
+                text = chunk.text
                 inputs = self.tokenizer(
                     # А точно ничего не потеряется? может, max_length вынести в параметры?
-                    chunk.text,
+                    text.strip(),
                     return_tensors="pt",
                     truncation=True,
                     max_length=settings.tokenizer_max_length,
@@ -107,6 +108,13 @@ class Translator:
                 translated = self.tokenizer.batch_decode(
                     tokens, skip_special_tokens=True
                 )[0]
+
+                # Добавляем потерянные пробелы. Если не обрезать их перед подачей в модель, перевод кривой
+                if text and translated:
+                    if text[0].isspace() and not translated[0].isspace():
+                        translated = " " + translated.lstrip()
+                    if text[-1].isspace() and not translated[-1].isspace():
+                        translated = translated.rstrip() + " "
                 translated_chunks.append((chunk.block_ix, translated))
 
         blocks = {}

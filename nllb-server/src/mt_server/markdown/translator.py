@@ -1,6 +1,7 @@
 # src/mt_server/markdown/translator.py
 
 import logging
+import re
 from typing import Any, Dict, List
 
 import html2text
@@ -39,9 +40,6 @@ class MarkdownTranslator:
         self.html_converter.ignore_links = False
         self.html_converter.ignore_images = False
         self.html_converter.body_width = 0  # Отключаем перенос строк
-        # self.html_converter.escape_snob = (
-        #     True  # Не конвертировать <b>, <i>, <span> и т.д. в markdown
-        # )
 
     def translate(self, markdown_text: str, src_lang: str, tgt_lang: str) -> str:
         if not markdown_text or not markdown_text.strip():
@@ -203,7 +201,12 @@ class MarkdownTranslator:
         if not html.strip():
             return ""
         try:
-            return self.html_converter.handle(html)
+            # Сохраняем пробелы - иначе побьётся разметка
+            # protected_html = re.sub(r" (?=[^>]*<|[^<>]*$)", "@", html)
+            protected_html = re.sub(r" (?=[^>]*<(?:/?[a-zA-Z1-6]+|!))", "\x01", html)
+
+            md = self.html_converter.handle(protected_html)
+            return md.replace("\x01", " ")
         except Exception as e:
             logger.error(f"HTML to Markdown conversion failed: {e}")
             return html

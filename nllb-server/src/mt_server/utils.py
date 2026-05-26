@@ -33,7 +33,7 @@ def get_segmenter(nllb_lang_code: str):
 
 def split_blocks(text: str) -> list[str]:
     blocks = BLOCK_SPLIT_RE.split(text)
-    return [block.strip() for block in blocks if block.strip()]
+    return [block for block in blocks if block.strip()]
 
 
 def split_sentences(text: str, nllb_lang_code: str) -> list[str]:
@@ -41,7 +41,14 @@ def split_sentences(text: str, nllb_lang_code: str) -> list[str]:
     # FALLBACK_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
     segmenter = get_segmenter(nllb_lang_code)
     segments = segmenter.segment(text)
-    return [s.strip() for s in segments if s.strip()]
+
+    # Если в начале блока был хоть один пробел - сохраняем один (чтоб не поломать разметку)
+    result = [
+        s if ix > 0 else (text[0] if text[0].isspace() else "") + s
+        for ix, s in enumerate(segments)
+    ]
+
+    return result
 
 
 def count_tokens(tokenizer, text: str) -> int:
@@ -51,12 +58,11 @@ def count_tokens(tokenizer, text: str) -> int:
 
 
 def split_long_sentence(tokenizer, sentence: str, max_tokens: int) -> list[str]:
-    # TODO: Предусмотреть работу без токенизатора, тогда длинна в солвах
     words = sentence.split()
     if not words:
         return []
     chunks: list[str] = []
-    current_words: list[str] = []
+    current_words: list[str] = [" "]
     for word in words:
         candidate_words = current_words + [word]
         candidate_text = " ".join(candidate_words)
@@ -64,7 +70,7 @@ def split_long_sentence(tokenizer, sentence: str, max_tokens: int) -> list[str]:
 
         if current_words and candidate_tokens > max_tokens:
             chunks.append(" ".join(current_words))
-            current_words = [word]
+            current_words = [" " + word]
         else:
             current_words.append(word)
 
@@ -104,7 +110,7 @@ def split_into_chunks(
                 block_changed = current_sentences and block_ix != current_block_ix
 
                 if exceeds_limit or block_changed:
-                    chunk_text = " ".join(current_sentences).strip()
+                    chunk_text = " ".join(current_sentences)
                     if chunk_text:
                         chunks.append(
                             TranslationChunk(
@@ -125,7 +131,7 @@ def split_into_chunks(
 
     # flush tail
     if current_sentences:
-        chunk_text = " ".join(current_sentences).strip()
+        chunk_text = " ".join(current_sentences)
 
         if chunk_text:
             chunks.append(

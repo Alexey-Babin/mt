@@ -62,6 +62,14 @@ def translate_html_content(
             # Вызов перевода
             try:
                 translated = translate_fn(text)
+                # Сохраняем ведущие и trailing пробелы оригинального текста
+                # if text and translated:
+                #     # Проверяем наличие ведущих пробелов в оригинале
+                #     if text[0].isspace() and not translated[0].isspace():
+                #         translated = " " + translated.lstrip()
+                #     # Проверяем наличие trailing пробелов в оригинале
+                #     if text[-1].isspace() and not translated[-1].isspace():
+                #         translated = translated.rstrip() + " "
                 node.replace_with(translated)
             except Exception as e:
                 logger.error(f"Translation failed for segment '{text[:50]}...': {e}")
