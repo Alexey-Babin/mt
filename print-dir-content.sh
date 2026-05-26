@@ -34,6 +34,7 @@ find "$TARGET_DIR" -type f \
     -not -path "*/.cache/*" \
     -not -path "*/tmp/*" \
     -not -path "*/temp/*" \
+    -not -path "*/*.egg-info/*" \
     2>/dev/null | while read -r file; do
     
     # Пропускаем скрытые файлы (начинающиеся с точки)
@@ -51,7 +52,8 @@ find "$TARGET_DIR" -type f \
     # Выводим разделитель и путь к файлу
     echo "---------------------------------------"
     echo "$file"
-    
+    echo "---------------------------------------"
+
     # Определяем расширение файла для указания языка в маркере
     extension="${file##*.}"
     

@@ -4,5 +4,8 @@
     "комплаенса"
   ],
   "python.defaultInterpreterPath": "${workspaceFolder}/nllb-server/.venv/bin/python",
-  "python.analysis.extraPaths": ["${workspaceFolder}/nllb-server"]
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/nllb-server"
+  ],
+  "dotenv.enableAutocloaking": false
 }
