@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from enum import StrEnum
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 from .config import settings
@@ -34,26 +34,49 @@ class LanguageLevels(StrEnum):
 
 
 # -------------------------------------------------------------
-# Глобальные зависимости
-translator_engine: Optional[NllbTranslationEngine] = None
-translation_service: Optional[TranslationService] = None
+# Dependency Injection - functions to provide engine and service
+
+# Private global variables for lifespan management
+# These should not be accessed directly in endpoints - use dependencies instead
+_translator_engine: Optional[NllbTranslationEngine] = None
+_translation_service: Optional[TranslationService] = None
+
+
+async def get_translator_engine() -> NllbTranslationEngine:
+    """Dependency to get the translator engine instance."""
+    if _translator_engine is None:
+        raise HTTPException(
+            status_code=503, detail="Translation engine not initialized"
+        )
+    return _translator_engine
+
+
+async def get_translation_service(
+    engine: NllbTranslationEngine = Depends(get_translator_engine),
+) -> TranslationService:
+    """Dependency to get the translation service instance."""
+    if _translation_service is None:
+        raise HTTPException(
+            status_code=503, detail="Translation service not initialized"
+        )
+    return _translation_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Инициализация и shutdown приложения."""
-    global translator_engine, translation_service
+    global _translator_engine, _translation_service
 
     logger.info("Loading NLLB model...")
     try:
         # Инициализация тяжелого движка
-        translator_engine = NllbTranslationEngine(model_name=settings.model_name)
+        _translator_engine = NllbTranslationEngine(model_name=settings.model_name)
         # Инициализация сервиса (обертка над движком)
-        translation_service = TranslationService(translator_engine)
-        if not translator_engine.has_cuda:
+        _translation_service = TranslationService(_translator_engine)
+        if not _translator_engine.has_cuda:
             logger.warning("No CUDA device found")
         logger.info(
-            f"Initialized translator with model {settings.model_name} on device {translator_engine.device}"
+            f"Initialized translator with model {settings.model_name} on device {_translator_engine.device}"
         )
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
@@ -62,8 +85,8 @@ async def lifespan(app: FastAPI):
     yield
     # ---------------------SHUTDOWN-------------------------------------
     logger.info("Shutting down...")
-    translator_engine = None
-    translation_service = None
+    _translator_engine = None
+    _translation_service = None
 
 
 app = FastAPI(title="NLLB Translation Server", lifespan=lifespan)
@@ -83,16 +106,16 @@ class TranslateResponse(BaseModel):
 
 
 @app.post("/translate", response_model=TranslateResponse)
-async def translate_endpoint(request: TranslateRequest):
+async def translate_endpoint(
+    request: TranslateRequest,
+    service: TranslationService = Depends(get_translation_service),
+):
     if not request.text:
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
-    if translation_service is None:
-        raise HTTPException(status_code=503, detail="Translation service not ready")
-
     try:
-        translation_service.engine.validate_language(request.src_lang)
-        translation_service.engine.validate_language(request.target_lang)
+        service.engine.validate_language(request.src_lang)
+        service.engine.validate_language(request.target_lang)
     except ValueError as err:
         raise HTTPException(status_code=400, detail=err)
 
@@ -100,7 +123,7 @@ async def translate_endpoint(request: TranslateRequest):
         # Выносим блокирующий вызов в отдельный поток через asyncio.to_thread()
         # Это предотвращает блокировку event loop при тяжелых операциях перевода
         result = await asyncio.to_thread(
-            translation_service.translate,
+            service.translate,
             text=request.text,
             src_lang=request.src_lang,
             tgt_lang=request.target_lang,
@@ -118,17 +141,17 @@ async def translate_endpoint(request: TranslateRequest):
 
 
 @app.get("/health")
-async def health_check():
+async def health_check(
+    engine: NllbTranslationEngine = Depends(get_translator_engine),
+    service: TranslationService = Depends(get_translation_service),
+):
 
-    if translator_engine and translation_service:
-        return {
-            "status": "ready",
-            "model": translator_engine.model_name,
-            "gpu": translator_engine.has_cuda,
-            "device": translator_engine.device,
-        }
-    else:
-        return {"status": "loading"}
+    return {
+        "status": "ready",
+        "model": engine.model_name,
+        "gpu": engine.has_cuda,
+        "device": engine.device,
+    }
 
 
 @app.get("/languages")
@@ -136,29 +159,23 @@ def get_languages(
     language_level: LanguageLevels = Query(
         LanguageLevels.MEMBERS_ONLY, description="Страны-члены, бывшие члены и все"
     ),
+    engine: NllbTranslationEngine = Depends(get_translator_engine),
 ):
 
-    if translator_engine:
-        lang_list = {
-            lang[0]: lang[1]
-            for lang in translator_engine.languages.items()
-            if (
-                (
-                    language_level == "members_only"
-                    and lang[1]
-                    and lang[1].get("ord") < 10
-                )
-                or (
-                    language_level == "former_members"
-                    and lang[1]
-                    and lang[1].get("ord") < 100
-                )
-                or (language_level == "all")
+    lang_list = {
+        lang[0]: lang[1]
+        for lang in engine.languages.items()
+        if (
+            (language_level == "members_only" and lang[1] and lang[1].get("ord") < 10)
+            or (
+                language_level == "former_members"
+                and lang[1]
+                and lang[1].get("ord") < 100
             )
-        }
-        return lang_list
-    else:
-        return {}
+            or (language_level == "all")
+        )
+    }
+    return lang_list
 
 
 if __name__ == "__main__":

@@ -23,10 +23,6 @@ class TranslationEngineProtocol(Protocol):
     tokenizer: object
     languages: dict
 
-    def get_supported_languages(self) -> list[str]:
-        """Return list of supported language codes."""
-        ...
-
     def validate_language(self, lang: str) -> None:
         """Validate languages are in model"""
         ...
@@ -60,7 +56,7 @@ class NllbTranslationEngine:
             dtype=torch.float16 if self.has_cuda else torch.float32,
         ).to(self.device)
 
-        # Чтобы не было конфликта между `max_new_tokens` and `max_length`
+        # Чтобы не было конфликта между `max_new_tokens` and `max_length`, выставляем max_length = None
         model.generation_config.max_length = None
         model.eval()
         self.model = model
@@ -69,11 +65,11 @@ class NllbTranslationEngine:
         self.languages = dict(
             [
                 (lang_code, languages_db.get(lang_code))
-                for lang_code in self.get_supported_languages()
+                for lang_code in self._get_supported_languages()
             ]
         )
 
-    def get_supported_languages(self):
+    def _get_supported_languages(self) -> list[str]:
         """Возвращает список языков, имеющихся в модели (только коды в формате nllb)"""
         langs = [
             token
@@ -87,7 +83,7 @@ class NllbTranslationEngine:
             raise ValueError(f"Unknown language: ${lang=}")
 
     @torch.inference_mode()
-    def translate(self, text, src_lang, tgt_lang):
+    def translate(self, text, src_lang, tgt_lang) -> str:
         chunks = split_into_chunks(
             tokenizer=self.tokenizer, text=text, nllb_lang_code=src_lang
         )

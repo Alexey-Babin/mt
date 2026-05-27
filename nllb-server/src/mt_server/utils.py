@@ -11,7 +11,6 @@ from .languages import languages_db
 
 # Проверить на разных значениях. Возможно, вынести в параметры
 HARD_SENTENCE_TOKEN_LIMIT = 256
-
 BLOCK_SPLIT_RE = re.compile(r"\n\s*\n+")
 
 
@@ -37,8 +36,6 @@ def split_blocks(text: str) -> list[str]:
 
 
 def split_sentences(text: str, nllb_lang_code: str) -> list[str]:
-    # TODO: Возможно, побить абзац на предложения через FALLBACK_SENTENCE_RE - в каком случае может понадобиться?
-    # FALLBACK_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
     segmenter = get_segmenter(nllb_lang_code)
     segments = segmenter.segment(text)
 

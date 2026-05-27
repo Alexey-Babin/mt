@@ -28,10 +28,6 @@ def ast_equal(a: str, b: str, rules: dict | None = None) -> bool:
 
     md = MarkdownIt()
 
-    # a_tokens = [(t.type, t.tag) for t in md.parse(a)]
-    # b_tokens = [(t.type, t.tag) for t in md.parse(b)]
-
-    # return a_tokens == b_tokens
     a_tokens = list(md.parse(a))
     b_tokens = list(md.parse(b))
 
