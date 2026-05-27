@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import sys
@@ -41,7 +42,6 @@ translation_service: Optional[TranslationService] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Инициализация и shutdown приложения."""
-    # ---------------------STARTUP--------------------------------------
     global translator_engine, translation_service
 
     logger.info("Loading NLLB model...")
@@ -62,7 +62,6 @@ async def lifespan(app: FastAPI):
     yield
     # ---------------------SHUTDOWN-------------------------------------
     logger.info("Shutting down...")
-    # Очистка ресурсов если нужна
     translator_engine = None
     translation_service = None
 
@@ -98,7 +97,10 @@ async def translate_endpoint(request: TranslateRequest):
         raise HTTPException(status_code=503, detail="Translation service not ready")
 
     try:
-        result = translation_service.translate(
+        # Выносим блокирующий вызов в отдельный поток через asyncio.to_thread()
+        # Это предотвращает блокировку event loop при тяжелых операциях перевода
+        result = await asyncio.to_thread(
+            translation_service.translate,
             text=request.text,
             src_lang=request.src_lang,
             tgt_lang=request.target_lang,
@@ -136,17 +138,27 @@ def get_languages(
     ),
 ):
 
-    lang_list = {
-        lang[0]: lang[1]
-        for lang in translator_engine.languages.items()
-        if (
-            (language_level == "members_only" and lang[1].get("ord") < 10)
-            or (language_level == "former_members" and lang[1].get("ord") < 100)
-            or (language_level == "all")
-        )
-    }
-
-    return lang_list
+    if translator_engine:
+        lang_list = {
+            lang[0]: lang[1]
+            for lang in translator_engine.languages.items()
+            if (
+                (
+                    language_level == "members_only"
+                    and lang[1]
+                    and lang[1].get("ord") < 10
+                )
+                or (
+                    language_level == "former_members"
+                    and lang[1]
+                    and lang[1].get("ord") < 100
+                )
+                or (language_level == "all")
+            )
+        }
+        return lang_list
+    else:
+        return {}
 
 
 if __name__ == "__main__":

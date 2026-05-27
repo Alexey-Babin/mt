@@ -43,5 +43,12 @@ class MTConfig:
         == "1"
     )
 
+    executor_max_workers: int = int(
+        os.environ.get(
+            "MT_EXECUTOR_MAX_WORKERS",
+            "2",
+        )
+    )
+
 
 settings = MTConfig()

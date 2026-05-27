@@ -33,7 +33,7 @@ class TranslatorProtocol(Protocol):
 
 
 class Translator:
-    def __init__(self, model_name):
+    def __init__(self, model_name: str):
         # Модель можно задать в переменной окружения
         self.model_path = os.path.join(settings.model_storage, model_name)
         self._lock = Lock()

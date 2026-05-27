@@ -5,9 +5,8 @@ from typing import Optional
 
 from .engine import TranslatorProtocol
 from .format_detection import TextFormat, looks_like_markdown
-from .markdown import MarkdownTranslator
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 class TranslationService:
@@ -15,7 +14,6 @@ class TranslationService:
 
     def __init__(self, engine: TranslatorProtocol):
         self.engine = engine
-        self.md_translator = MarkdownTranslator(engine)
 
     def translate(
         self,
@@ -44,11 +42,8 @@ class TranslationService:
         try:
             match actual_format:
                 case TextFormat.MARKDOWN:
-                    return self.md_translator.translate(
-                        text,
-                        src_lang,
-                        tgt_lang,
-                    )
+                    # TODO: Develop and create markdown translator
+                    raise NotImplementedError("Markdown is not implemented yet")
 
                 case _:
                     return self.engine.translate(
