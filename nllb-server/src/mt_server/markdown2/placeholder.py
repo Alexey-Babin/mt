@@ -75,11 +75,11 @@ class PlaceholderManager:
                 self._counter += 1
                 current_id = self._counter
 
-            tag_mask = f" {{ /{prefix}_{current_id} }} "
+            tag_mask = f" {{/{prefix}_{current_id}}} "
         else:
             self._counter += 1
             current_id = self._counter
-            tag_mask = f" {{ {prefix}_{current_id} }} "
+            tag_mask = f" {{{prefix}_{current_id}}} "
 
             # Запоминаем ID в стек только для открывающих тегов транслируемой разметки
             if strategy == "INLINE_TRANSLATE":
