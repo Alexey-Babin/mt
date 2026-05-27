@@ -3,8 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from .engine import TranslatorProtocol
+from .engine import TranslationEngineProtocol
 from .format_detection import TextFormat, looks_like_markdown
+from .handlers import FormatHandler, MarkdownHandler, PlainHandler
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -12,8 +13,12 @@ logger = logging.getLogger("uvicorn.error")
 class TranslationService:
     """Служба перевода - определение формата входных данных, выбор специализированного переводчика"""
 
-    def __init__(self, engine: TranslatorProtocol):
+    def __init__(self, engine: TranslationEngineProtocol):
         self.engine = engine
+        self._handlers: dict[TextFormat, FormatHandler] = {
+            TextFormat.PLAIN: PlainHandler(),
+            TextFormat.MARKDOWN: MarkdownHandler(),
+        }
 
     def translate(
         self,
@@ -40,17 +45,10 @@ class TranslationService:
                 f"Using format: {actual_format.value} for translation {src_lang}->{tgt_lang}"
             )
         try:
-            match actual_format:
-                case TextFormat.MARKDOWN:
-                    # TODO: Develop and create markdown translator
-                    raise NotImplementedError("Markdown is not implemented yet")
-
-                case _:
-                    return self.engine.translate(
-                        text,
-                        src_lang,
-                        tgt_lang,
-                    )
+            handler = self._handlers.get(actual_format)
+            if handler:
+                return handler.handle(text, src_lang, tgt_lang, self.engine)
+            raise ValueError(f"Unknown format: {actual_format}")
         except Exception as e:
             logger.error(f"Translation service error: {e}", exc_info=True)
             # Fallback: пробуем перевести как plain text, чтобы не возвращать ошибку пользователю

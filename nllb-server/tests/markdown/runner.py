@@ -6,9 +6,9 @@ from mt_server.translation_service import TranslationService
 USE_MOCK = os.environ.get("USE_MOCK_TRANSLATOR", "false").lower() == "true"
 
 if USE_MOCK:
-    from tests.mock_translator import MockTranslator as Translator
+    from tests.mock_translator import MockTranslationEngine as TranslationEngine
 else:
-    from mt_server.engine import Translator
+    from mt_server.engine import NllbTranslationEngine as TranslationEngine
 
 print(f"{USE_MOCK=}")
 
@@ -16,9 +16,9 @@ print(f"{USE_MOCK=}")
 def run_translation(text: str) -> str:
 
     if USE_MOCK:
-        translator = Translator("")
+        translator = TranslationEngine("")
     else:
-        translator = Translator("/opt/mt/models/nllb-200-distilled-600M")
+        translator = TranslationEngine("/opt/mt/models/nllb-200-distilled-600M")
     service = TranslationService(translator)
 
     return service.translate(

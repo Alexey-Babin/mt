@@ -5,14 +5,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from mt_server.engine import Translator
+from mt_server.engine import TranslationEngineProtocol
 from mt_server.translation_service import TranslationService
 
 
 @pytest.fixture
 def mock_translator():
     """Create a mock translator for testing."""
-    mock = MagicMock(spec=Translator)
+    mock = MagicMock(spec=TranslationEngineProtocol)
     mock.model_name = "nllb-200-distilled-600M"
     mock.has_cuda = False
     mock.device = "cpu"

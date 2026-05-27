@@ -14,8 +14,8 @@ MODEL_COMPILE = settings.model_compile
 LANG_PATTERN = re.compile(r"^[a-z]{3}_[A-Z][a-z]{3}$")
 
 
-class TranslatorProtocol(Protocol):
-    """Protocol defining the interface for a translator."""
+class TranslationEngineProtocol(Protocol):
+    """Protocol defining the interface for a translation engine."""
 
     model_name: str
     has_cuda: bool
@@ -36,7 +36,7 @@ class TranslatorProtocol(Protocol):
         ...
 
 
-class Translator:
+class NllbTranslationEngine:
     def __init__(self, model_name: str):
         # Модель можно задать в переменной окружения
         self.model_path = os.path.join(settings.model_storage, model_name)
@@ -133,3 +133,8 @@ class Translator:
             result.append(" ".join(blocks[block_ix]))
 
         return "\n\n".join(result)
+
+
+# Backward compatibility aliases
+Translator = NllbTranslationEngine
+TranslatorProtocol = TranslationEngineProtocol

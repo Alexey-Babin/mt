@@ -1,7 +1,7 @@
 """
-Mock Translator for testing.
+Mock Translation Engine for testing.
 
-This module provides a mock implementation of the Translator class
+This module provides a mock implementation of the TranslationEngineProtocol
 that can be used for testing without requiring the actual NLLB model.
 
 The mock only handles plain text translation. Code blocks, inline code,
@@ -16,8 +16,8 @@ class MockTokenizer:
     pass
 
 
-class MockTranslator:
-    """Mock translator for testing purposes."""
+class MockTranslationEngine:
+    """Mock translation engine for testing purposes."""
 
     model_name: str = "mock-nllb-model"
     tokenizer: object

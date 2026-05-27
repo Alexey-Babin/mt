@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 from .config import settings
-from .engine import Translator
+from .engine import NllbTranslationEngine
 from .translation_service import TextFormat, TranslationService
 
 # Логирование
@@ -35,7 +35,7 @@ class LanguageLevels(StrEnum):
 
 # -------------------------------------------------------------
 # Глобальные зависимости
-translator_engine: Optional[Translator] = None
+translator_engine: Optional[NllbTranslationEngine] = None
 translation_service: Optional[TranslationService] = None
 
 
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     logger.info("Loading NLLB model...")
     try:
         # Инициализация тяжелого движка
-        translator_engine = Translator(model_name=settings.model_name)
+        translator_engine = NllbTranslationEngine(model_name=settings.model_name)
         # Инициализация сервиса (обертка над движком)
         translation_service = TranslationService(translator_engine)
         if not translator_engine.has_cuda:
