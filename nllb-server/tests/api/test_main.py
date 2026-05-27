@@ -1,6 +1,5 @@
 """Tests for FastAPI endpoints in main.py"""
 
-from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,18 +15,13 @@ def client():
     return TestClient(app)
 
 
-def _make_executor_mock():
-    """Create a mock event loop where run_in_executor returns an awaitable."""
+def _make_to_thread_mock():
+    """Create a mock asyncio.to_thread that returns an awaitable."""
 
-    async def async_wrapper(fn, *args, **kwargs):
+    async def async_to_thread(fn, *args, **kwargs):
         return fn(*args, **kwargs)
 
-    def sync_run_in_executor(executor, fn, *args, **kwargs):
-        return async_wrapper(fn, *args, **kwargs)
-
-    mock_loop = MagicMock()
-    mock_loop.run_in_executor = MagicMock(side_effect=sync_run_in_executor)
-    return mock_loop
+    return async_to_thread
 
 
 class TestTranslateEndpoint:
@@ -37,14 +31,12 @@ class TestTranslateEndpoint:
         """Test successful translation request."""
         with (
             patch("mt_server.main.translation_service") as mock_service,
-            patch("mt_server.main.executor") as mock_executor,
             patch(
-                "mt_server.main.asyncio.get_event_loop",
-                return_value=_make_executor_mock(),
+                "mt_server.main.asyncio.to_thread",
+                side_effect=_make_to_thread_mock(),
             ),
         ):
             mock_service.translate = MagicMock(return_value="Translated text")
-            mock_executor.__class__ = ThreadPoolExecutor
 
             response = client.post(
                 "/translate",
@@ -78,10 +70,7 @@ class TestTranslateEndpoint:
 
     def test_translate_endpoint_service_not_ready(self, client):
         """Test translation when service is not initialized."""
-        with (
-            patch("mt_server.main.translation_service", None),
-            patch("mt_server.main.executor", None),
-        ):
+        with patch("mt_server.main.translation_service", None):
             response = client.post(
                 "/translate",
                 json={
@@ -94,40 +83,18 @@ class TestTranslateEndpoint:
             assert response.status_code == 503
             assert response.json()["detail"] == "Translation service not ready"
 
-    def test_translate_endpoint_executor_not_ready(self, client):
-        """Test translation when executor is not initialized."""
-        with (
-            patch("mt_server.main.translation_service") as mock_service,
-            patch("mt_server.main.executor", None),
-        ):
-            mock_service.translate = MagicMock(return_value="Translated text")
-
-            response = client.post(
-                "/translate",
-                json={
-                    "text": "Hello",
-                    "src_lang": "eng_Latn",
-                    "target_lang": "rus_Cyrl",
-                },
-            )
-
-            assert response.status_code == 503
-            assert response.json()["detail"] == "Executor not ready"
-
     def test_translate_endpoint_internal_error(self, client):
         """Test translation with internal error."""
         with (
             patch("mt_server.main.translation_service") as mock_service,
-            patch("mt_server.main.executor") as mock_executor,
             patch(
-                "mt_server.main.asyncio.get_event_loop",
-                return_value=_make_executor_mock(),
+                "mt_server.main.asyncio.to_thread",
+                side_effect=_make_to_thread_mock(),
             ),
         ):
             mock_service.translate = MagicMock(
                 side_effect=Exception("Translation failed")
             )
-            mock_executor.__class__ = ThreadPoolExecutor
 
             response = client.post(
                 "/translate",
@@ -146,14 +113,12 @@ class TestTranslateEndpoint:
         """Test translation with different format values."""
         with (
             patch("mt_server.main.translation_service") as mock_service,
-            patch("mt_server.main.executor") as mock_executor,
             patch(
-                "mt_server.main.asyncio.get_event_loop",
-                return_value=_make_executor_mock(),
+                "mt_server.main.asyncio.to_thread",
+                side_effect=_make_to_thread_mock(),
             ),
         ):
             mock_service.translate = MagicMock(return_value="Translated text")
-            mock_executor.__class__ = ThreadPoolExecutor
 
             response = client.post(
                 "/translate",

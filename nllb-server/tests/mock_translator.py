@@ -106,3 +106,6 @@ class MockTranslator:
                 result = result.replace(src, tgt)
 
         return result
+
+    def validate_language(self, lang: str) -> None:
+        pass

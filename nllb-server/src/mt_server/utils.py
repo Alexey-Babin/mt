@@ -6,8 +6,8 @@ from functools import lru_cache
 import pysbd
 import regex as re
 
-from mt_server.config import settings
-from mt_server.languages import languages_db
+from .config import settings
+from .languages import languages_db
 
 # Проверить на разных значениях. Возможно, вынести в параметры
 HARD_SENTENCE_TOKEN_LIMIT = 256

@@ -27,6 +27,10 @@ class TranslatorProtocol(Protocol):
         """Return list of supported language codes."""
         ...
 
+    def validate_language(self, lang: str) -> None:
+        """Validate languages are in model"""
+        ...
+
     def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
         """Translate text from source language to target language."""
         ...
@@ -77,6 +81,10 @@ class Translator:
             if LANG_PATTERN.match(token)
         ]
         return sorted(langs)
+
+    def validate_language(self, lang: str) -> None:
+        if self.languages.get(lang) is None:
+            raise ValueError(f"Unknown language: ${lang=}")
 
     @torch.inference_mode()
     def translate(self, text, src_lang, tgt_lang):

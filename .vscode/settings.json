@@ -5,7 +5,10 @@
   "python.analysis.extraPaths": ["${workspaceFolder}/nllb-server/src"],
 
   "python.testing.pytestArgs": ["tests/", "-v"],
+
   "python.testing.pytestEnabled": true,
   "python.testing.pytestPath": "${workspaceFolder}/nllb-server/.venv/bin/pytest",
-  "python.testing.cwd": "${workspaceFolder}/nllb-server"
+  "python.testing.cwd": "${workspaceFolder}/nllb-server",
+
+  "python.envFile": "${workspaceFolder}/nllb-server/.env.test"
 }

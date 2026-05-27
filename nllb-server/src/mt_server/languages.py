@@ -1,8 +1,9 @@
 import json
 import logging
+import pathlib
 from typing import Dict, TypedDict
 
-LANGUAGES_DB_FILE = "languages.json"
+LANGUAGES_DB_FILE = pathlib.Path(__file__).parent.parent.parent / "languages.json"
 
 logger = logging.getLogger("uvicorn.error")
 

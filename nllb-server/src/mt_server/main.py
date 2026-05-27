@@ -87,14 +87,14 @@ async def translate_endpoint(request: TranslateRequest):
     if not request.text:
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
-    # # Валидация языков
-    # try:
-    #     validate_language_pair(request.source_lang, request.target_lang)
-    # except ValueError as e:
-    #     raise HTTPException(status_code=400, detail=str(e))
-
     if translation_service is None:
         raise HTTPException(status_code=503, detail="Translation service not ready")
+
+    try:
+        translation_service.engine.validate_language(request.src_lang)
+        translation_service.engine.validate_language(request.target_lang)
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=err)
 
     try:
         # Выносим блокирующий вызов в отдельный поток через asyncio.to_thread()

@@ -159,7 +159,6 @@ LANGUAGES_DB_FILE = "languages.json"  # Сломается при запуске
 
 - [`__init__.py`](nllb-server/src/mt_server/__init__.py) — пустой, нет публичного API
 - `mt_client/` — пустая директория
-- [`runner.py`](nllb-server/tests/markdown/runner.py:21) — захардкожен путь к модели
 
 ---
 
@@ -274,7 +273,7 @@ flowchart TD
 - [ ] Реализован `MarkdownTranslator`
 - [ ] Реализована система placeholder'ов
 - [ ] Реализована AST-сегментация
-- [ ] Исправлена блокировка event loop
+- [x] Исправлена блокировка event loop
 - [ ] Пройдены все тесты из `data/markdown-tests/`
 - [ ] Обновлён `TranslationService` для делегирования
 - [ ] Добавлена документация по архитектуре
