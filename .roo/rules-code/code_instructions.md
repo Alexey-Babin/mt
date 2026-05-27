@@ -1,0 +1,7 @@
+- Write clean, production-ready code without unnecessary explanations or conversational filler.
+- NEVER rewrite an entire file if you only need to change a few lines. Use precise code blocks or search-and-replace style modifications.
+- Before writing any code for a third-party library, explicitly use the `context7` MCP tool to verify the latest API methods and syntax. Do not rely on your internal training data for packages.
+- Always output code snippets strictly using markdown blocks with the correct language identifier.
+- Write comments in code in English, be concise
+- When write python code, prefer typing, acceptable to pylance
+- Do not forget about logging in `uvicorn` default logger: `logger = logging.getLogger("uvicorn.error")`

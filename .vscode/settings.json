@@ -1,11 +1,11 @@
 {
-  "cSpell.words": [
-    "Nllb",
-    "комплаенса"
-  ],
+  "cSpell.words": ["Nllb", "комплаенса"],
+  "dotenv.enableAutocloaking": false,
   "python.defaultInterpreterPath": "${workspaceFolder}/nllb-server/.venv/bin/python",
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}/nllb-server"
-  ],
-  "dotenv.enableAutocloaking": false
+  "python.analysis.extraPaths": ["${workspaceFolder}/nllb-server/src"],
+
+  "python.testing.pytestArgs": ["tests/", "-v"],
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestPath": "${workspaceFolder}/nllb-server/.venv/bin/pytest",
+  "python.testing.cwd": "${workspaceFolder}/nllb-server"
 }

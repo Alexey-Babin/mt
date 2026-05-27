@@ -1,0 +1,3 @@
+- when use python tools ONLY use uv packaging tool
+- NOT run python scripts directly, use `uv run`
+- NOT install dependencies with `pip`, use only uv: `uv add`, `uv sync`, `uv venv` etc

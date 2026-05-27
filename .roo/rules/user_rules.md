@@ -1,0 +1,3 @@
+- At the very beginning of the session, search the `memory` MCP server to load any stored preferences about this project, styling guides, or stack details.
+- At the end of every successfully completed task or when an important technical decision is reached (e.g., database port changed, new library installed, specific code pattern chosen), automatically call `memory` MCP tools (`create_entities`/`create_relations`) to remember this fact for future chat sessions.
+- Always respond in Russian language, but keep all technical terms, code variables, architecture patterns, and MCP tool interactions strictly in English.

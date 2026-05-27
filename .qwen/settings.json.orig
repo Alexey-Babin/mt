@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(which *)"
+    ]
+  },
+  "$version": 4
+}
