@@ -170,6 +170,9 @@ class ASTWalker:
     ):
         """Сценарий Г: Обрабатывает каркас документа (blockquote, list_item), сохраняя маркеры вложенности."""
         node_id = self._generate_node_id()
+        # Извлекаем оригинальный маркер из node.markup (для bullet_list это '-', '*', '+')
+        # и сохраняем его в поле info, чтобы reconstructor мог его точно восстановить.
+        node_info = getattr(node, "markup", None) or node.content or ""
 
         unit = TranslationUnit(
             node_id=node_id,
@@ -181,8 +184,9 @@ class ASTWalker:
             parent_id=parent_id,
             index_in_parent=index,
             level=node.level,
-            tag=node.tag,
+            tag=node.tag,  # Здесь теперь всегда лежит чистый HTML тег узла ('ul', 'li' и т.д.)
             attrs=dict(node.attrs) if node.attrs else {},
+            info=str(node_info) if node_info else None,  # Передаем маркер в поле info
         )
         self.units.append(unit)
 
