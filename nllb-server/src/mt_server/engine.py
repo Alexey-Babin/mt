@@ -20,7 +20,7 @@ class TranslationEngineProtocol(Protocol):
     model_name: str
     has_cuda: bool
     device: str
-    tokenizer: object
+    tokenizer: NllbTokenizer
     languages: dict
 
     def validate_language(self, lang: str) -> None:

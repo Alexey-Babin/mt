@@ -49,7 +49,6 @@ def split_sentences(text: str, nllb_lang_code: str) -> list[str]:
 
 
 def count_tokens(tokenizer, text: str) -> int:
-    # TODO: Добавить типизацию encoder, fallback
     encoded = tokenizer(text, add_special_tokens=False, truncation=False)
     return len(encoded["input_ids"])
 

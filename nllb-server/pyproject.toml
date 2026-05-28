@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.136.1",
     "markdown>=3.10.2",
     "markdown-it-py>=4.2.0",
+    "mdit-py-plugins>=0.6.1",
     "pydantic>=2.13.4",
     "pypandoc>=1.17",
     "pysbd>=0.3.4",

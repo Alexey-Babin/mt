@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class TranslationUnitType(Enum):
+class TranslationUnitType(StrEnum):
     """Стратегия обработки узла AST в системе перевода."""
 
     # Текстовый контейнер (переводится целиком как абзац)

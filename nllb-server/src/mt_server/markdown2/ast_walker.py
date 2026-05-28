@@ -4,7 +4,8 @@ from markdown_it.tree import SyntaxTreeNode
 
 from .node_type import get_unit_type
 from .placeholder import PlaceholderManager
-from .translation_unit import TranslationUnit, TranslationUnitType
+from .translation_unit import TranslationUnit
+from .translation_unit_type import TranslationUnitType
 
 
 class ASTWalker:
