@@ -465,10 +465,7 @@ def test_reconstruct_definition_list(reconstructor):
 
 
 def test_reconstruct_fence_inside_blockquote(reconstructor):
-    """Тест восстановления блока кода внутри цитаты.
-
-    Внутренние строки кода НЕ должны получать префиксы '> ', чтобы не ломать синтаксис.
-    """
+    """Тест восстановления блока кода внутри цитаты."""
     bq_open = TranslationUnit(
         node_id="node_1",
         node_type="blockquote_open",
@@ -478,7 +475,7 @@ def test_reconstruct_fence_inside_blockquote(reconstructor):
         need_translation=False,
         tag="blockquote",
     )
-    # 2. Многострочный код внутри fence
+    # Исходный красивый одиночный токен "fence"
     fence_node = TranslationUnit(
         node_id="node_2",
         node_type="fence",
@@ -500,6 +497,5 @@ def test_reconstruct_fence_inside_blockquote(reconstructor):
 
     result = reconstructor.reconstruct([bq_open, fence_node, bq_close])
 
-    # ИСПРАВЛЕНО: Убран лишний \n после знака цитаты
     expected = "> ```python\ndef hello():\n    print('world')\n```\n\n"
     assert result == expected

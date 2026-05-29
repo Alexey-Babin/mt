@@ -38,14 +38,15 @@ class ASTWalker:
         self, node: SyntaxTreeNode, parent_id: Optional[str] = None, index: int = 0
     ):
         """Рекурсивный метод обхода дерева в глубину (DFS)."""
-        unit_type = get_unit_type(node.type)
 
-        # Системный шум ("document") полностью пропускаем сквозь себя,
-        # не создавая для него TranslationUnit, но уходя рекурсивно к детям.
-        if node.type == "document":
+        # Сначала проверяем тип строки на "root" или "document" БЕЗ вызова get_unit_type,
+        # так как у корневого узла 'root' нельзя безопасно читать свойства токенов.
+        if node.type in ("root", "document"):
             for idx, child in enumerate(node.children):
                 self._traverse(child, parent_id=parent_id, index=idx)
             return
+
+        unit_type = get_unit_type(node.type)
 
         # --- РЕЖИМ НАКОПЛЕНИЯ ТЕКСТА (Если стек контекстов не пуст) ---
         if self._context_stack:
@@ -170,9 +171,12 @@ class ASTWalker:
     ):
         """Сценарий Г: Обрабатывает каркас документа (blockquote, list_item), сохраняя маркеры вложенности."""
         node_id = self._generate_node_id()
-        # Извлекаем оригинальный маркер из node.markup (для bullet_list это '-', '*', '+')
-        # и сохраняем его в поле info, чтобы reconstructor мог его точно восстановить.
+
         node_info = getattr(node, "markup", None) or node.content or ""
+
+        # У токенов fence в markdown-it-py язык кода (например, info = "python") лежит в поле node.info
+        # Вытаскиваем его, чтобы reconstructor знал язык подсветки синтаксиса
+        lang_info = getattr(node, "info", "") or None
 
         unit = TranslationUnit(
             node_id=node_id,
@@ -184,13 +188,21 @@ class ASTWalker:
             parent_id=parent_id,
             index_in_parent=index,
             level=node.level,
-            tag=node.tag,  # Здесь теперь всегда лежит чистый HTML тег узла ('ul', 'li' и т.д.)
+            tag=node.tag,
             attrs=dict(node.attrs) if node.attrs else {},
-            info=str(node_info) if node_info else None,  # Передаем маркер в поле info
+            info=str(lang_info)
+            if lang_info
+            else (str(node_info) if node_info in ("-", "*", "+") else None),
         )
         self.units.append(unit)
 
-        # Рекурсивно спускаемся к детям только для открывающих тегов (или одиночных блоков вроде fence)
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Если это одиночный блок кода/математики/HTML,
+        # мы полностью БЛОКИРУЕМ рекурсивный спуск в его детей, предотвращая дублирование в списке units
+        if node.type in ("fence", "code_block", "math_block", "html_block"):
+            return
+
+        # Для всех остальных парных структурных блоков (цитаты, списки) спускаемся к детям,
+        # только если это открывающий тег
         if not node.type.endswith("_close"):
             for idx, child in enumerate(node.children):
                 self._traverse(child, parent_id=node_id, index=idx)

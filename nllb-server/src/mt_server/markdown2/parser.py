@@ -23,7 +23,7 @@ def create_markdown_parser() -> MarkdownIt:
     md.use(footnote_plugin)
     md.use(tasklists_plugin)
     md.use(deflist_plugin)
-    md.use(dollarmath_plugin, enable_dollars=True)
+    md.use(dollarmath_plugin)
     md.use(front_matter_plugin)
     md.use(attrs_plugin)
     md.use(anchors_plugin)

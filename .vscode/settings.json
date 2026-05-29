@@ -3,12 +3,11 @@
   "dotenv.enableAutocloaking": false,
   "python.defaultInterpreterPath": "${workspaceFolder}/nllb-server/.venv/bin/python",
   "python.analysis.extraPaths": ["${workspaceFolder}/nllb-server/src"],
-
-  "python.testing.pytestArgs": ["tests/", "-v"],
-
+  "python.testing.pytestArgs": ["tests/", "-vv"],
   "python.testing.pytestEnabled": true,
   "python.testing.pytestPath": "${workspaceFolder}/nllb-server/.venv/bin/pytest",
   "python.testing.cwd": "${workspaceFolder}/nllb-server",
 
-  "python.envFile": "${workspaceFolder}/nllb-server/.env.test"
+  "python.envFile": "${workspaceFolder}/nllb-server/.env.test",
+  "wolf.disableHotModeWarning": true
 }

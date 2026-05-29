@@ -43,10 +43,9 @@
 
 1. **Parser** - парсит Markdown в AST с использованием `markdown-it-py` + `mdit-py-plugins`
 2. **AST Walker** - обходит дерево и классифицирует узлы
-3. **Text Extractor** - извлекает переводимый текст с плейсхолдерами
-4. **Chunking Engine** - разбивает текст на чанки для перевода
-5. **Translation Engine** - переводит текст (NLLB)
-6. **Text Merger** - объединяет переведенные чанки
+4. **Chunking** - разбивает текст на чанки для перевода
+5. **Translation** - переводит текст (NLLB)
+6. **Text Merger** - объединяет переведенные чанки (в chunker)
 7. **Placeholder Manager** - управляет плейсхолдерами
 8. **AST Reconstructor** - восстанавливает AST с переведенным текстом
 
@@ -72,130 +71,18 @@ from mdit_py_plugins.field_list import fieldlist_plugin
 
 ### 2.2 Конфигурация парсера
 
-```python
-def create_markdown_parser() -> MarkdownIt:
-    """Создает парсер Markdown с поддержкой расширенного синтаксиса."""
-    md = MarkdownIt("commonmark")
-    
-    # Встроенные плагины
-    md.enable("table")
-    
-    # Внешние плагины
-    md.use(table_plugin)
-    md.use(footnote_plugin)
-    md.use(tasklist_plugin)
-    md.use(deflist_plugin)
-    md.use(dollarmath_plugin, enable_dollars=True)
-    md.use(front_matter_plugin)
-    md.use(attrs_plugin)
-    md.use(anchors_plugin)
-    md.use(fieldlist_plugin)
-    
-    return md
-```
+Файл nllb-server/src/mt_server/markdown2/parser.py
 
 ### 2.3 Типы узлов AST
 
-| Тип узла | Описание | Пример |
-|----------|----------|--------|
-| `document` | Корневой узел документа | - |
-| `heading_open` / `heading_close` | Заголовок | `# Title` |
-| `paragraph_open` / `paragraph_close` | Параграф | `Text` |
-| `text` | Текстовый узел | `Hello` |
-| `code_inline` | Inline код | `` `code` `` |
-| `fence` | Fenced code block | ```python\ncode\n``` |
-| `code_block` | Indented code block | 4 пробела + код |
-| `link_open` / `link_close` | Ссылка | `[text](url)` |
-| `image` | Изображение | `![alt](url)` |
-| `html_inline` | Inline HTML | `<span>` |
-| `html_block` | HTML блок | `<div>` |
-| `bullet_list_open` / `bullet_list_close` | Маркированный список | `- item` |
-| `ordered_list_open` / `ordered_list_close` | Нумерованный список | `1. item` |
-| `list_item_open` / `list_item_close` | Элемент списка | - |
-| `blockquote_open` / `blockquote_close` | Цитата | `> text` |
-| `em_open` / `em_close` | Курсив | `*text*` |
-| `strong_open` / `strong_close` | Жирный | `**text**` |
-| `s_open` / `s_close` | Зачеркнутый | `~~text~~` |
-| `table_open` / `table_close` | Таблица | `| a | b |` |
-| `thead_open` / `thead_close` | Шапка таблицы | - |
-| `tbody_open` / `tbody_close` | Тело таблицы | - |
-| `tr_open` / `tr_close` | Строка таблицы | - |
-| `th_open` / `th_close` | Ячейка шапки | - |
-| `td_open` / `td_close` | Ячейка тела | - |
-| `hr` | Горизонтальная линия | `---` |
-| `softbreak` | Мягкий перенос | `\n` |
-| `hardbreak` | Жесткий перенос | `<br>` |
-| `front_matter` | YAML frontmatter | `---\ntitle: x\n---` |
-| `math_inline` | Inline математика | `$x + y$` |
-| `math_block` | Блочная математика | `$$x + y$$` |
-| `footnote_ref` | Ссылка на сноску | `[^1]` |
-| `footnote_block_open` / `footnote_block_close` | Блок сносок | - |
-| `footnote_open` / `footnote_close` | Сноска | `[^1]: text` |
-| `tasklist_item` | Элемент списка задач | `- [x] done` |
-| `dl_open` / `dl_close` | Список определений | - |
-| `dt_open` / `dt_close` | Термин | - |
-| `dd_open` / `dd_close` | Определение | - |
-
+Файл nllb-server/src/mt_server/markdown2/node_type.py
 ---
 
 ## 3. Классификация узлов
 
 ### 3.1 Типы TranslationUnit
 
-```python
-from enum import Enum
-from dataclasses import dataclass
-from typing import Optional, List
-
-class TranslationUnitType(Enum):
-    """Тип единицы перевода."""
-    
-    # Полностью переводимые узлы
-    FULL_TEXT = "full_text"           # Параграфы, заголовки, ячейки таблиц
-    PARTIAL_TEXT = "partial_text"     # Узлы с частично переводимым текстом
-    
-    # Непереводимые узлы
-    NON_TRANSLATABLE = "non_translatable"  # Код, математика, HTML
-    STRUCTURAL = "structural"              # Структурные узлы (списки, таблицы)
-    METADATA = "metadata"                  # Метаданные (frontmatter)
-    
-    # Специальные узлы
-    LINK = "link"                     # Ссылки (переводим только текст)
-    IMAGE = "image"                   # Изображения (переводим alt)
-    FOOTNOTE = "footnote"             # Сноски (переводим содержимое)
-
-@dataclass
-class TranslationUnit:
-    """Единица перевода с метаданными."""
-    
-    # Идентификация
-    node_id: str                      # Уникальный ID узла
-    node_type: str                    # Тип узла AST
-    unit_type: TranslationUnitType    # Тип единицы перевода
-    
-    # Текст для перевода
-    original_text: str                # Оригинальный текст
-    extracted_text: str               # Извлеченный текст с плейсхолдерами
-    translated_text: Optional[str] = None  # Переведенный текст
-    
-    # Плейсхолдеры
-    placeholders: List[Placeholder] = None
-    
-    # Позиция в AST
-    parent_id: Optional[str] = None
-    index_in_parent: Optional[int] = None
-    level: int = 0
-    
-    # Метаданные
-    attrs: Optional[dict] = None      # Атрибуты узла
-    tag: Optional[str] = None         # HTML тег
-    info: Optional[str] = None        # Дополнительная информация (язык кода)
-    
-    # Статус
-    is_translated: bool = False
-    has_errors: bool = False
-    error_message: Optional[str] = None
-```
+nllb-server/src/mt_server/markdown2/translation_unit_type.py
 
 ### 3.2 Правила классификации
 
@@ -279,110 +166,10 @@ class TranslationUnit:
 
 ### 4.2 Генерация уникальных ID
 
-```python
-class PlaceholderManager:
-    """Управляет плейсхолдерами и их ID."""
-    
-    def __init__(self):
-        self.counter: Dict[str, int] = {}
-        self.placeholders: Dict[str, Placeholder] = {}
-    
-    def generate_id(self, placeholder_type: str) -> str:
-        """Генерирует уникальный ID для плейсхолдера."""
-        if placeholder_type not in self.counter:
-            self.counter[placeholder_type] = 0
-        
-        self.counter[placeholder_type] += 1
-        return f"{placeholder_type}_{self.counter[placeholder_type]}"
-    
-    def create_placeholder(self, node: SyntaxTreeNode) -> Placeholder:
-        """Создает плейсхолдер из узла AST."""
-        placeholder_type = self._get_placeholder_type(node)
-        placeholder_id = self.generate_id(placeholder_type)
-        
-        placeholder = Placeholder(
-            id=placeholder_id,
-            type=placeholder_type,
-            original_content=self._extract_content(node),
-            node_type=node.type,
-            attrs=node.attrs.copy() if node.attrs else None,
-            tag=node.tag,
-            info=node.info
-        )
-        
-        self.placeholders[placeholder_id] = placeholder
-        return placeholder
-    
-    def _get_placeholder_type(self, node: SyntaxTreeNode) -> str:
-        """Определяет тип плейсхолдера по типу узла."""
-        type_map = {
-            "code_inline": "code",
-            "fence": "code",
-            "code_block": "code",
-            "math_inline": "math",
-            "math_block": "math",
-            "link_open": "link",
-            "image": "image",
-            "html_inline": "html",
-            "html_block": "html",
-        }
-        return get_unit_type(node.type)
-```
+Файл nllb-server/src/mt_server/markdown2/placeholder.py
 
 ### 4.3 Извлечение текста из узла
 
-```python
-def extract_translatable_text(
-    node: SyntaxTreeNode,
-    placeholder_manager: PlaceholderManager
-) -> str:
-    """
-    Извлекает переводимый текст из узла с заменой непереводимых частей на плейсхолдеры.
-    
-    Args:
-        node: Узел AST
-        placeholder_manager: Менеджер плейсхолдеров
-        
-    Returns:
-        Текст с плейсхолдерами
-    """
-    if node.type == "text":
-        return node.content
-    
-    elif node.type in ["code_inline", "fence", "code_block"]:
-        placeholder = placeholder_manager.create_placeholder(node)
-        return f"{{{placeholder.type}:{placeholder.id}}}"
-    
-    elif node.type in ["math_inline", "math_block"]:
-        placeholder = placeholder_manager.create_placeholder(node)
-        return f"{{{placeholder.type}:{placeholder.id}}}"
-    
-    elif node.type == "link_open":
-        # Извлекаем текст ссылки, сохраняем URL как плейсхолдер
-        text = ""
-        for child in node.children or []:
-            text += extract_translatable_text(child, placeholder_manager)
-        
-        placeholder = placeholder_manager.create_placeholder(node)
-        return f"{{{placeholder.type}:{placeholder.id}:{text}}}"
-    
-    elif node.type == "image":
-        # Переводим alt текст, сохраняем URL
-        alt_text = node.attrs.get("alt", "") if node.attrs else ""
-        placeholder = placeholder_manager.create_placeholder(node)
-        return f"{{{placeholder.type}:{placeholder.id}:{alt_text}}}"
-    
-    elif node.type in ["html_inline", "html_block"]:
-        placeholder = placeholder_manager.create_placeholder(node)
-        return f"{{{placeholder.type}:{placeholder.id}}}"
-    
-    else:
-        # Рекурсивно обрабатываем дочерние узлы
-        text = ""
-        for child in node.children or []:
-            text += extract_translatable_text(child, placeholder_manager)
-        return text
-```
 
 ---
 
@@ -1063,95 +850,7 @@ def batch_translate(
 | `task-lists` | Списки задач | Статус задач сохранен |
 | `definition-lists` | Списки определений | Структура сохранена |
 
-### 10.2 Правила валидации
-
-```json
-{
-  "preserve_heading_levels": true,
-  "preserve_inline_formatting": true,
-  "preserve_links": true,
-  "preserve_href": true,
-  "preserve_link_titles": true,
-  "preserve_inline_code": true,
-  "preserve_fence_language": true,
-  "preserve_code_exactly": true,
-  "preserve_tables": true,
-  "preserve_table_dimensions": true,
-  "preserve_html_blocks": true,
-  "preserve_raw_html": true,
-  "preserve_inline_html": true,
-  "preserve_list_structure": true,
-  "preserve_list_nesting": true,
-  "preserve_ordered_lists": true,
-  "preserve_escapes": true,
-  "handle_malformed_input": true,
-  "parse_yaml_frontmatter": true,
-  "translate_yaml_values": true,
-  "preserve_yaml_structure": true,
-  "preserve_math": true,
-  "preserve_footnote_markers": true,
-  "translate_footnote_content": true,
-  "maintain_footnote_order": true,
-  "compare_ast_structure": true,
-  "strict_text_equality": false
-}
-```
-
----
-
-## 11. Примеры использования
-
-### 11.1 Базовый перевод
-
-```python
-from markdown_translator import MarkdownTranslator
-
-translator = MarkdownTranslator(
-    source_lang="eng_Latn",
-    target_lang="rus_Cyrl"
-)
-
-markdown_input = """
-# Hello World
-
-This is **bold** text with `code`.
-
-- Item 1
-- Item 2
-"""
-
-translated = translator.translate(markdown_input)
-print(translated)
-```
-
-### 11.2 Перевод с кастомными плагинами
-
-```python
-from markdown_translator import MarkdownTranslator
-from mdit_py_plugins import custom_plugin
-
-translator = MarkdownTranslator(
-    source_lang="eng_Latn",
-    target_lang="rus_Cyrl",
-    custom_plugins=[custom_plugin]
-)
-
-translated = translator.translate(markdown_input)
-```
-
-### 11.3 Пакетный перевод
-
-```python
-documents = [
-    "# Doc 1\nContent 1",
-    "# Doc 2\nContent 2",
-    "# Doc 3\nContent 3"
-]
-
-translated_docs = translator.batch_translate(documents)
-```
-
----
+### 10.2 Юнит-тесты
 
 ## 12. Заключение
 
@@ -1161,7 +860,4 @@ translated_docs = translator.batch_translate(documents)
 2. **Интеллектуальное чанкование** - разбиение на чанки с учетом границ и контекста
 3. **Управление плейсхолдерами** - надежная система замены непереводимых элементов
 4. **Обработка edge cases** - поддержка сложных сценариев и ошибок
-5. **Расширяемость** - поддержка кастомных плагинов и правил
-6. **Производительность** - кэширование, параллельная обработка, пакетная обработка
-
-Система готова к интеграции в существующий NLLB сервер и может быть расширена для поддержки дополнительных форматов и сценариев использования.
+6. **Производительность** - кэширование, параллельная обработка, пакетная обработка (Next steps

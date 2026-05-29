@@ -52,6 +52,7 @@ class MarkdownHandler(FormatHandler):
     def handle(
         self, text: str, src_lang: str, tgt_lang: str, engine: TranslationEngineProtocol
     ) -> str:
+
         raise NotImplementedError("Markdown is not implemented yet")
 
     @property

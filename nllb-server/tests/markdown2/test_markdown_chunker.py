@@ -88,7 +88,7 @@ def test_create_chunks_basic_greedy_packing(chunker):
     # Проверяем склейку через маркер
     assert (
         chunk.to_plain_text()
-        == "Первое короткое предложение. ||| Второе предложение документа."
+        == "Первое короткое предложение.\x1eВторое предложение документа."
     )
 
 
@@ -157,7 +157,7 @@ def test_safe_split_long_sentence_indivisible_token_protection(chunker):
 
 
 def test_merge_translations_ideal_scenario(chunker):
-    """Тест мержа в идеальном сценарии: количество маркеров совпало на 100%."""
+    """Тест мержа в идеальном сценарии: количество маркеров \x1e совпало на 100%."""
     u1 = TranslationUnit(
         node_id="node_1",
         node_type="paragraph",
@@ -178,19 +178,18 @@ def test_merge_translations_ideal_scenario(chunker):
     chunk = MarkdownChunk(chunk_id=1)
     chunk.segments = [
         ChunkSegment(
-            unit_id="node_1", text="Текст один с __TRIPLE_PIPE__"
-        ),  # имитируем экранированный пользовательский пайп
+            unit_id="node_1",
+            text="Текст один с |||",  # Пользовательский пайп идет внутри текста как есть
+        ),
         ChunkSegment(unit_id="node_2", text="Текст два"),
     ]
 
-    # Ответ от модели (модель перевела и сохранила маркеры)
-    translated_response = (
-        "Translated text one with __TRIPLE_PIPE__ ||| Translated text two"
-    )
+    # ИСПРАВЛЕНО: Передаем строку ответа модели, разделенную управляющим символом \x1e
+    translated_response = "Translated text one with |||\x1eTranslated text two"
 
     chunker.merge_translations([chunk], [translated_response], [u1, u2])
 
-    # Проверяем, что перевод разложился по юнитам и маркер разэкранировался
+    # Проверяем, что перевод разложился по юнитам без ложных срабатываний fallback
     assert u1.translated_text == "Translated text one with |||"
     assert u1.is_translated is True
     assert u2.translated_text == "Translated text two"
@@ -317,7 +316,7 @@ def test_merge_translations_keeps_empty_segments_preventing_false_fallback(chunk
     ]
 
     # Имитируем ответ модели, где второй сегмент перевелся как пустая строка (два разделителя подряд)
-    translated_response = "Translated one |||  ||| Translated three"
+    translated_response = "Translated one\x1e \x1eTranslated three"
 
     # Запускаем мерж. Если пустая строка отфильтруется, длина станет 2 вместо 3, и включится fallback.
     # Мы проверяем, что отработал идеальный линейный сценарий.

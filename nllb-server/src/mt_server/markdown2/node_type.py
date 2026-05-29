@@ -75,18 +75,35 @@ for inline in _INLINE_PROTECT_TYPES:
 for inline in _INLINE_TRANSLATE_SINGLE:
     _NODE_TYPE_MAP[inline] = TranslationUnitType.INLINE_TRANSLATE
 
+# ИСПРАВЛЕНО: Разделяем парные и одиночные структурные блоки
+_PARSED_STRUCTURAL_BLOCKS = {
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "blockquote",
+    "bullet_list",
+    "ordered_list",
+    "list_item",
+    "footnote_block",
+    "dl",
+    "field_list",
+    "field",
+}
+_SINGLE_STRUCTURAL_BLOCKS = {"fence", "code_block", "math_block", "html_block"}
+
 # Заполняем структурные контейнеры open/close
-for block in _STRUCTURAL_BLOCKS:
+for block in _PARSED_STRUCTURAL_BLOCKS:
     _NODE_TYPE_MAP[f"{block}_open"] = TranslationUnitType.STRUCTURAL_IGNORE
     _NODE_TYPE_MAP[f"{block}_close"] = TranslationUnitType.STRUCTURAL_IGNORE
 
+# Заполняем одиночные структурные блоки СТРОГО без суффиксов
+for block in _SINGLE_STRUCTURAL_BLOCKS:
+    _NODE_TYPE_MAP[block] = TranslationUnitType.STRUCTURAL_IGNORE
+
 # Служебные одиночные токены и исключения
-_NODE_TYPE_MAP["text"] = (
-    TranslationUnitType.INLINE_TRANSLATE
-)  # Текст является транслируемым элементом
-_NODE_TYPE_MAP["inline"] = (
-    TranslationUnitType.STRUCTURAL_IGNORE
-)  # Контейнер markdown-it для детей
+_NODE_TYPE_MAP["text"] = TranslationUnitType.INLINE_TRANSLATE
+_NODE_TYPE_MAP["inline"] = TranslationUnitType.STRUCTURAL_IGNORE
 _NODE_TYPE_MAP["document"] = TranslationUnitType.STRUCTURAL_IGNORE
 _NODE_TYPE_MAP["hr"] = TranslationUnitType.STRUCTURAL_IGNORE
 _NODE_TYPE_MAP["front_matter"] = TranslationUnitType.SPECIAL_CASE

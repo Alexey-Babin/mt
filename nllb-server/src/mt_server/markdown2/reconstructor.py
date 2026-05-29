@@ -108,8 +108,29 @@ class MarkdownReconstructor:
         is_close = unit.node_type.endswith("_close")
         base_type = unit.node_type.replace("_open", "").replace("_close", "")
 
+        # Хронологический перехват блоков кода (fence, code_block) и разделителей (hr)
+        # Обрабатываем их строго ОДИН раз (при открытии или если это одиночный токен hr)
+        if base_type in ("fence", "code_block"):
+            if is_open or (not is_open and not is_close):
+                # 1. Перед блоком кода выставляем текущий префикс вложенности (> ),
+                # чтобы сам маркер открытия ``` встал на правильный уровень структуры цитаты
+                prefix, _ = self._get_current_prefix(for_block_start=False)
+                if prefix and (not self._buffer or self._buffer[-1].endswith("\n")):
+                    self._buffer.append(prefix)
+
+                # 2. Пишем сам блок кода НАПРЯМУЮ в буфер.
+                # Это гарантирует, что внутренние строки кода останутся чистыми и без префиксов '> '.
+                info_str = unit.info or ""
+                code_content = f"```{info_str}\n{unit.original_text}```\n\n"
+                self._buffer.append(code_content)
+            return  # Игнорируем fence_close, предотвращая засорение стека блоков
+
+        if unit.node_type == "hr":
+            self._write_with_prefix("---\n\n")
+            return
+
+        # --- СТАНДАРТНАЯ СТРУКТУРНАЯ ЛОГИКА ДЛЯ ПАРНЫХ КОНТЕЙНЕРОВ (цитаты, списки) ---
         if is_open:
-            # 1. Динамическое определение маркера для списков
             marker = "-"
             if base_type == "ordered_list":
                 start_num = unit.attrs.get("start", 1) if unit.attrs else 1
@@ -120,8 +141,7 @@ class MarkdownReconstructor:
                 elif unit.tag and unit.tag in ("-", "*", "+"):
                     marker = unit.tag
             elif base_type == "list_item":
-                # ИСПРАВЛЕНО: Элемент списка наследует маркер от своего родительского контейнера в стеке!
-                # Ищем последний активный список в стеке блоков
+                # Элемент списка наследует маркер от своего родительского контейнера в стеке
                 parent_list = next(
                     (
                         b
@@ -143,6 +163,7 @@ class MarkdownReconstructor:
             )
 
         elif is_close:
+            # Безопасно снимаем блок со стека
             if self._block_stack and self._block_stack[-1]["type"] == base_type:
                 self._block_stack.pop()
 
@@ -155,23 +176,6 @@ class MarkdownReconstructor:
             ):
                 if self._buffer and not self._buffer[-1].endswith("\n"):
                     self._buffer.append("\n")
-        else:
-            # Одиночные блоковые элементы разметки (fence, code_block, hr)
-            if unit.node_type in ("fence", "code_block"):
-                # 1. Перед блоком кода выставляем текущий префикс вложенности (> ),
-                # чтобы сам маркер открытия ``` встал на правильный уровень структуры
-                prefix = self._get_current_prefix(for_block_start=False)[0]
-                if prefix and (not self._buffer or self._buffer[-1].endswith("\n")):
-                    self._buffer.append(prefix)
-
-                # 2. ИСПРАВЛЕНО: Пишем сам блок кода НАПРЯМУЮ в буфер, минуя _write_with_prefix.
-                # Это гарантирует, что внутренние строки кода останутся чистыми и без префиксов '> '.
-                info_str = unit.info or ""
-                code_content = f"```{info_str}\n{unit.original_text}```\n\n"
-                self._buffer.append(code_content)
-
-            elif unit.node_type == "hr":
-                self._write_with_prefix("---\n\n")
 
     def _handle_special_case(self, unit: TranslationUnit):
         """Обрабатывает узлы метаданных Front Matter.
