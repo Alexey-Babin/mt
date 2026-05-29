@@ -1,53 +1,59 @@
-# Техническая спецификация системы перевода Markdown с сохранением форматирования
+# Техническая спецификация системы перевода Markdown v2.0
+## (Улучшенная версия на основе анализа реализации)
+
+---
 
 ## 1. Обзор системы
 
 Система переводит Markdown-документы с сохранением всей структуры форматирования, включая вложенность, списки, таблицы, код, математические формулы и другие элементы.
 
-### 1.1 Архитектура
+### 1.1 Архитектура (уточненная)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Markdown Translation System               │
+│                    Markdown Translation Pipeline             │
 ├─────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐       │
-│  │   Parser    │───▶│   AST       │───▶│ Translation │       │
-│  │             │    │   Builder   │    │   Engine    │       │
-│  └─────────────┘    └─────────────┘    └─────────────┘       │
-│         │                   │                   │             │
-│         ▼                   ▼                   ▼             │
-│  markdown-it-py      SyntaxTreeNode      NLLB Engine         │
-│  + mdit-py-plugins                                            │
-│                                                                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐       │
-│  │ Placeholder │◀───│   Chunking  │◀───│   AST       │       │
-│  │   Manager   │    │   Engine    │    │   Walker    │       │
-│  └─────────────┘    └─────────────┘    └─────────────┘       │
-│         │                   │                   │             │
-│         ▼                   ▼                   ▼             │
-│  Tag Generator      Chunk Splitter      Node Classifier       │
-│                                                                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐       │
-│  │   AST       │◀───│   Text      │◀───│   Text      │       │
-│  │Reconstructor│    │   Merger    │    │   Extractor │       │
-│  └─────────────┘    └─────────────┘    └─────────────┘       │
-│         │                   │                   │             │
-│         ▼                   ▼                   ▼             │
-│  markdown-it-py      Chunk Merger      Text Collector         │
-│                                                                 │
+│                                                               │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐      │
+│  │   Parser    │───▶│   AST       │───▶│   Walker    │      │
+│  │             │    │   Root      │    │             │      │
+│  └─────────────┘    └─────────────┘    └─────────────┘      │
+│         │                   │                   │            │
+│         ▼                   ▼                   ▼            │
+│  markdown-it-py      SyntaxTreeNode      DFS + Stack         │
+│  + mdit-py-plugins                       Context Tracking    │
+│                                                               │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐      │
+│  │ Placeholder │◀───│ Translation │◀───│  Chunking   │      │
+│  │   Manager   │    │   Units     │    │   Engine    │      │
+│  └─────────────┘    └─────────────┘    └─────────────┘      │
+│         │                   │                   │            │
+│         ▼                   ▼                   ▼            │
+│  Tag Mask Generator   Flat List       \x1E Separator        │
+│  LIFO Stack for Pairs  + Metadata    Token-aware Split      │
+│                                                               │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐      │
+│  │   State     │◀───│   Merger    │◀───│ Translation │      │
+│  │   Machine   │    │   Fallback  │    │   Engine    │      │
+│  │  Reconstr.  │    │   Align     │    │   (NLLB)    │      │
+│  └─────────────┘    └─────────────┘    └─────────────┘      │
+│         │                   │                   │            │
+│         ▼                   ▼                   ▼            │
+│  Block Stack +       \x1E Split +      Batch API            │
+│  Prefix Calculator   Mask Anchor       + Error Handling     │
+│                                                               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 Основные компоненты
+### 1.2 Основные компоненты (актуализированные)
 
-1. **Parser** - парсит Markdown в AST с использованием `markdown-it-py` + `mdit-py-plugins`
-2. **AST Walker** - обходит дерево и классифицирует узлы
-4. **Chunking** - разбивает текст на чанки для перевода
-5. **Translation** - переводит текст (NLLB)
-6. **Text Merger** - объединяет переведенные чанки (в chunker)
-7. **Placeholder Manager** - управляет плейсхолдерами
-8. **AST Reconstructor** - восстанавливает AST с переведенным текстом
+1. **Parser** (`parser.py`) - парсит Markdown в AST с использованием `markdown-it-py` + `mdit-py-plugins`
+2. **ASTWalker** (`ast_walker.py`) - обходит дерево DFS, классифицирует узлы, управляет стеком контекстов
+3. **PlaceholderManager** (`placeholder.py`) - создает маски `{prefix_id}` для защиты элементов
+4. **TranslationUnit** (`translation_unit.py`) - единица перевода с метаданными и плейсхолдерами
+5. **MarkdownChunker** (`chunker.py`) - разбивает на чанки с разделителем `\x1E`, мержит ответы
+6. **MarkdownReconstructor** (`reconstructor.py`) - state machine для обратной сборки Markdown
+7. **MarkdownTranslator** (`markdown_translator.py`) - оркестратор полного конвейера
 
 ---
 
@@ -60,7 +66,7 @@ from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
 from mdit_py_plugins.table import table_plugin
 from mdit_py_plugins.footnote import footnote_plugin
-from mdit_py_plugins.tasklist import tasklist_plugin
+from mdit_py_plugins.tasklists import tasklists_plugin
 from mdit_py_plugins.deflist import deflist_plugin
 from mdit_py_plugins.dollarmath import dollarmath_plugin
 from mdit_py_plugins.front_matter import front_matter_plugin
@@ -71,572 +77,406 @@ from mdit_py_plugins.field_list import fieldlist_plugin
 
 ### 2.2 Конфигурация парсера
 
-Файл nllb-server/src/mt_server/markdown2/parser.py
+```python
+def create_markdown_parser() -> MarkdownIt:
+    md = MarkdownIt("commonmark")
 
-### 2.3 Типы узлов AST
+    # Встроенные плагины
+    md.enable("table")
 
-Файл nllb-server/src/mt_server/markdown2/node_type.py
+    # Внешние плагины
+    md.use(footnote_plugin)
+    md.use(tasklists_plugin)
+    md.use(deflist_plugin)
+    md.use(dollarmath_plugin)
+    md.use(front_matter_plugin)
+    md.use(attrs_plugin)
+    md.use(anchors_plugin)
+    md.use(fieldlist_plugin)
+
+    return md
+```
+
+### 2.3 Типы узлов AST (из реализации)
+
+| Категория | Типы узлов | Пример |
+|-----------|------------|--------|
+| **CONTEXT_BLOCK** | `paragraph_open/close`, `heading_open/close`, `th_open/close`, `td_open/close`, `dt_open/close`, `dd_open/close`, `footnote_open/close`, `field_name_open/close`, `field_body_open/close` | Текст для перевода |
+| **INLINE_TRANSLATE** | `strong_open/close`, `em_open/close`, `s_open/close`, `link_open/close`, `image` | Форматирование + текст |
+| **INLINE_PROTECT** | `code_inline`, `math_inline`, `html_inline`, `footnote_ref`, `tasklist_item`, `softbreak`, `hardbreak` | Защита плейсхолдером |
+| **STRUCTURAL_IGNORE** | `fence`, `code_block`, `math_block`, `html_block`, `table_open/close`, `thead_open/close`, `tbody_open/close`, `tr_open/close`, `blockquote_open/close`, `bullet_list_open/close`, `ordered_list_open/close`, `list_item_open/close`, `footnote_block_open/close`, `dl_open/close`, `field_list_open/close`, `field_open/close`, `hr`, `inline`, `document` | Каркас документа |
+| **SPECIAL_CASE** | `front_matter` | YAML метаданные |
+
 ---
 
-## 3. Классификация узлов
+## 3. Классификация узлов (уточненная)
 
-### 3.1 Типы TranslationUnit
+### 3.1 Стратегии обработки (TranslationUnitType)
 
-nllb-server/src/mt_server/markdown2/translation_unit_type.py
+```python
+class TranslationUnitType(StrEnum):
+    CONTEXT_BLOCK = "context_block"      # Текстовый контейнер (переводится целиком)
+    INLINE_TRANSLATE = "inline_translate" # Inline-элемент, текст внутри переводится
+    INLINE_PROTECT = "inline_protect"     # Нетранслируемый инлайн (изолируется плейсхолдером)
+    STRUCTURAL_IGNORE = "structural_ignore" # Структурный шум (сохраняет каркас)
+    SPECIAL_CASE = "special_case"         # Требует кастомной логики (Front Matter)
+```
 
-### 3.2 Правила классификации
+### 3.2 Правила классификации (из node_type.py)
 
-#### 3.2.1 Полностью переводимые узлы (FULL_TEXT)
-
-| Узел | Правило | Пример |
-|------|---------|--------|
-| `paragraph` | Весь текст внутри параграфа переводится | `This is text` |
-| `heading` | Текст заголовка переводится, уровень сохраняется | `# Title` |
-| `text` | Простой текстовый узел | `Hello` |
-| `em` | Курсивный текст переводится | `*italic*` |
-| `strong` | Жирный текст переводится | `**bold**` |
-| `s` | Зачеркнутый текст переводится | `~~strikethrough~~` |
-| `th` | Текст ячейки шапки таблицы | `| Header |` |
-| `td` | Текст ячейки тела таблицы | `| Cell |` |
-| `dt` | Термин в списке определений | `Term` |
-| `dd` | Определение в списке определений | `Definition` |
-
-#### 3.2.2 Частично переводимые узлы (PARTIAL_TEXT)
+#### 3.2.1 CONTEXT_BLOCK - текстовые контейнеры
 
 | Узел | Правило | Пример |
 |------|---------|--------|
-| `link` | Переводится только текст ссылки, URL сохраняется | `[text](url)` |
+| `paragraph_open/close` | Весь текст внутри параграфа переводится | `This is text` |
+| `heading_open/close` | Текст заголовка переводится, уровень сохраняется | `# Title` |
+| `th_open/close` | Текст ячейки шапки таблицы | `| Header |` |
+| `td_open/close` | Текст ячейки тела таблицы | `| Cell |` |
+| `dt_open/close` | Термин в списке определений | `Term` |
+| `dd_open/close` | Определение в списке определений | `Definition` |
+| `footnote_open/close` | Содержимое сноски | `[^1]: text` |
+| `field_name_open/close` | Имя поля в field_list | `:name:` |
+| `field_body_open/close` | Тело поля в field_list | `value` |
+
+#### 3.2.2 INLINE_TRANSLATE - транслируемые инлайны
+
+| Узел | Правило | Пример |
+|------|---------|--------|
+| `strong_open/close` | Жирный текст переводится, маркер `**` сохраняется | `**bold**` |
+| `em_open/close` | Курсивный текст переводится, маркер `*` сохраняется | `*italic*` |
+| `s_open/close` | Зачеркнутый текст переводится, маркер `~~` сохраняется | `~~strikethrough~~` |
+| `link_open/close` | Переводится только текст ссылки, URL сохраняется | `[text](url)` |
 | `image` | Переводится alt текст, URL сохраняется | `![alt](url)` |
-| `footnote` | Переводится содержимое сноски | `[^1]: text` |
-| `front_matter` | Переводятся значения YAML, ключи сохраняются | `title: Text` |
 
-#### 3.2.3 Непереводимые узлы (NON_TRANSLATABLE)
+#### 3.2.3 INLINE_PROTECT - защищаемые атомарные инлайны
 
 | Узел | Правило | Пример |
 |------|---------|--------|
-| `code_inline` | Inline код не переводится | `` `code` `` |
-| `fence` | Fenced code block не переводится | ```python\ncode\n``` |
-| `code_block` | Indented code block не переводится | 4 пробела + код |
+| `code_inline` | Inline код не переводится, защищается плейсхолдером | `` `code` `` |
 | `math_inline` | Inline математика не переводится | `$x + y$` |
-| `math_block` | Блочная математика не переводится | `$$x + y$$` |
 | `html_inline` | Inline HTML не переводится | `<span>` |
-| `html_block` | HTML блок не переводится | `<div>` |
-| `hr` | Горизонтальная линия не переводится | `---` |
-| `softbreak` | Мягкий перенос не переводится | `\n` |
-| `hardbreak` | Жесткий перенос не переводится | `<br>` |
-
-#### 3.2.4 Структурные узлы (STRUCTURAL)
-
-| Узел | Правило | Пример |
-|------|---------|--------|
-| `bullet_list` | Структура списка сохраняется | `- item` |
-| `ordered_list` | Структура списка сохраняется | `1. item` |
-| `list_item` | Структура элемента сохраняется | - |
-| `blockquote` | Структура цитаты сохраняется | `> text` |
-| `table` | Структура таблицы сохраняется | `| a | b |` |
-| `thead` | Структура шапки сохраняется | - |
-| `tbody` | Структура тела сохраняется | - |
-| `tr` | Структура строки сохраняется | - |
-| `dl` | Структура списка определений сохраняется | - |
-
-#### 3.2.5 Специальные узлы
-
-| Узел | Правило | Пример |
-|------|---------|--------|
-| `tasklist_item` | Переводится текст, статус задачи сохраняется | `- [x] done` |
 | `footnote_ref` | Маркер сноски не переводится | `[^1]` |
-| `footnote_block` | Блок сносок сохраняется | - |
+| `tasklist_item` | Чекбокс задачи не переводится | `- [x]` |
+| `softbreak` | Мягкий перенос сохраняется как `\n` | `\n` |
+| `hardbreak` | Жесткий перенос сохраняется как `<br>` | `<br>` |
+
+#### 3.2.4 STRUCTURAL_IGNORE - структурные блоки
+
+| Узел | Правило | Пример |
+|------|---------|--------|
+| `fence` | Fenced code block не переводится целиком | ```python\ncode\n``` |
+| `code_block` | Indented code block не переводится | 4 пробела + код |
+| `math_block` | Блочная математика не переводится | `$$x + y$$` |
+| `html_block` | HTML блок не переводится | `<div>` |
+| `table_open/close` | Структура таблицы сохраняется | `| a | b |` |
+| `thead_open/close` | Структура шапки таблицы | - |
+| `tbody_open/close` | Структура тела таблицы | - |
+| `tr_open/close` | Структура строки таблицы | - |
+| `blockquote_open/close` | Структура цитаты сохраняется | `> text` |
+| `bullet_list_open/close` | Структура маркированного списка | `- item` |
+| `ordered_list_open/close` | Структура нумерованного списка | `1. item` |
+| `list_item_open/close` | Структура элемента списка | - |
+| `footnote_block_open/close` | Блок сносок | - |
+| `dl_open/close` | Список определений | - |
+| `field_list_open/close` | Список полей | - |
+| `field_open/close` | Поле в field_list | - |
+| `hr` | Горизонтальная линия | `---` |
+| `inline` | Контейнер инлайн-элементов (игнорируется) | - |
+| `document` | Корневой элемент (игнорируется) | - |
+
+#### 3.2.5 SPECIAL_CASE - специальные случаи
+
+| Узел | Правило | Пример |
+|------|---------|--------|
+| `front_matter` | YAML метаданные обрабатываются отдельно | `---\ntitle: Text\n---` |
 
 ---
 
-## 4. Извлечение текста с плейсхолдерами
+## 4. Управление плейсхолдерами
 
-### 4.1 Формат плейсхолдеров
+### 4.1 Формат плейсхолдеров (из реализации)
 
 ```
-{placeholder_type:placeholder_id:content}
+{prefix_id}           - открывающий тег
+{/prefix_id}          - закрывающий тег
 ```
+
+**Префиксы:**
+- `s` - strong (`**`)
+- `e` - em (`*`)
+- `lnk` - link
+- `img` - image
+- `code` - code_inline
+- `math` - math_inline
+- `html` - html_inline
+- `fn` - footnote_ref
+- `chk` - tasklist_item
+- `br` - softbreak/hardbreak
+- `ph` - fallback для неизвестных типов
 
 **Примеры:**
-- `{code:1:def hello():}` - inline код
-- `{math:2:x + y = z}` - математика
-- `{link:3:https://example.com}` - ссылка
-- `{image:4:https://example.com/img.png}` - изображение
-- `{html:5:<span class="test">}` - HTML
+- `{code_1}` - inline код
+- `{math_2}` - математика
+- `{lnk_1}текст{/lnk_1}` - ссылка с текстом
+- `{s_1}жирный{/s_1}` - жирный текст
+- `{img_1}` - изображение
 
 ### 4.2 Генерация уникальных ID
 
-Файл nllb-server/src/mt_server/markdown2/placeholder.py
+```python
+class PlaceholderManager:
+    def __init__(self):
+        self._counter: int = 0
+        self.registry: Dict[str, Placeholder] = {}
+        self._open_tags_stacks: Dict[str, List[int]] = {}  # LIFO стек для парных тегов
 
-### 4.3 Извлечение текста из узла
+    def create_placeholder(self, node: SyntaxTreeNode) -> Placeholder:
+        # Для закрывающих тегов - берем ID из стека
+        # Для открывающих - инкрементируем счетчик и пушим в стек
+        # Для одиночных тегов (code, image) - просто инкрементируем
+```
 
+### 4.3 Структура Placeholder
+
+```python
+@dataclass
+class Placeholder:
+    id: int                              # Уникальный ID
+    tag_mask: str                        # Маска вида " {prefix_id} "
+    strategy: Literal["INLINE_TRANSLATE", "INLINE_PROTECT"]
+    node_type: str                       # Тип узла AST
+    original_markup: Union[str, Dict]    # Оригинальная разметка или атрибуты
+    is_closing: bool = False             # Флаг закрывающего тега
+```
 
 ---
 
-## 5. Алгоритм чанкования
+## 5. Алгоритм чанкования (уточненный)
 
 ### 5.1 Стратегия чанкования
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Chunking Strategy                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Сбор всех TranslationUnit из AST                         │
-│  2. Группировка по структурным границам:                     │
-│     - Заголовки (heading)                                     │
-│     - Блоки кода (code block)                                 │
-│     - Таблицы (table)                                         │
-│     - Цитаты (blockquote)                                     │
-│     - Списки (list)                                           │
-│  3. Разбиение на чанки по лимиту токенов                     │
-│  4. Сохранение иерархии и контекста                          │
-│                                                                 │
-└─────────────────────────────────────────────────────────────┘
+```python
+@dataclass(slots=True)
+class ChunkSegment:
+    """Атомарная единица текста внутри чанка."""
+    unit_id: str      # ID TranslationUnit
+    text: str         # Текст сегмента
+
+@dataclass(slots=True)
+class MarkdownChunk:
+    """Пакет данных для передачи в NLLB."""
+    chunk_id: int
+    segments: List[ChunkSegment]
+    token_count: int
+    sentence_count: int
+
+    def to_plain_text(self) -> str:
+        # Использует непечатный ASCII символ \x1E (Record Separator)
+        # NLLB гарантированно переносит его без изменений
+        return "\x1e".join(seg.text for seg in self.segments)
 ```
 
-### 5.2 Алгоритм
+### 5.2 Алгоритм создания чанков
 
 ```python
-@dataclass
-class TranslationChunk:
-    """Чанк текста для перевода."""
-    
-    chunk_id: str
-    units: List[TranslationUnit]      # Единицы перевода в чанке
-    text: str                          # Текст для перевода
-    tokens: int                        # Количество токенов
-    context: Dict[str, Any]            # Контекст (заголовки, родители)
-    boundaries: ChunkBoundaries        # Границы чанка
-
-@dataclass
-class ChunkBoundaries:
-    """Границы чанка для сохранения структуры."""
-    
-    starts_with_heading: bool = False
-    ends_with_heading: bool = False
-    in_list: bool = False
-    in_table: bool = False
-    in_blockquote: bool = False
-    list_level: int = 0
-    table_row: Optional[int] = None
-    table_col: Optional[int] = None
-
-def create_chunks(
-    units: List[TranslationUnit],
-    max_tokens: int = 512,
-    tokenizer: Any = None
-) -> List[TranslationChunk]:
+def create_chunks(self, units: List[TranslationUnit]) -> List[MarkdownChunk]:
     """
-    Создает чанки из единиц перевода.
-    
-    Args:
-        units: Список единиц перевода
-        max_tokens: Максимальное количество токенов в чанке
-        tokenizer: Токенизатор для подсчета токенов
-        
-    Returns:
-        Список чанков
+    Алгоритм упаковки юнитов в чанки:
+
+    1. Фильтруем только юниты с need_translation=True
+    2. Для каждого юнита разбиваем extracted_text на предложения (pysbd)
+    3. Для каждого предложения:
+       a. Считаем токены
+       b. Если предложение > max_tokens, разбиваем на части (_safe_split_long_sentence)
+       c. Если часть > max_tokens, обрабатываем как неделимый элемент
+    4. Жадная упаковка: добавляем сегменты в текущий чанк пока <= max_tokens
+    5. При превышении - создаем новый чанк
+    6. Возвращаем список чанков
     """
-    chunks: List[TranslationChunk] = []
-    current_chunk_units: List[TranslationUnit] = []
-    current_text = ""
-    current_tokens = 0
-    
-    for unit in units:
-        # Подсчитываем токены для текущей единицы
-        unit_tokens = count_tokens(unit.extracted_text, tokenizer)
-        
-        # Проверяем, нужно ли создать новый чанк
-        would_exceed_limit = current_tokens + unit_tokens > max_tokens
-        is_boundary = _is_strong_boundary(unit)
-        
-        if (current_chunk_units and (would_exceed_limit or is_boundary)):
-            # Создаем чанк
-            chunk = TranslationChunk(
-                chunk_id=f"chunk_{len(chunks) + 1}",
-                units=current_chunk_units.copy(),
-                text=current_text.strip(),
-                tokens=current_tokens,
-                context=_build_context(current_chunk_units),
-                boundaries=_detect_boundaries(current_chunk_units)
-            )
-            chunks.append(chunk)
-            
-            # Сбрасываем текущий чанк
-            current_chunk_units = []
-            current_text = ""
-            current_tokens = 0
-        
-        # Добавляем единицу в текущий чанк
-        current_chunk_units.append(unit)
-        current_text += unit.extracted_text + " "
-        current_tokens += unit_tokens
-    
-    # Добавляем последний чанк
-    if current_chunk_units:
-        chunk = TranslationChunk(
-            chunk_id=f"chunk_{len(chunks) + 1}",
-            units=current_chunk_units,
-            text=current_text.strip(),
-            tokens=current_tokens,
-            context=_build_context(current_chunk_units),
-            boundaries=_detect_boundaries(current_chunk_units)
-        )
-        chunks.append(chunk)
-    
-    return chunks
-
-def _is_strong_boundary(unit: TranslationUnit) -> bool:
-    """Проверяет, является ли узел сильной границей для чанкования."""
-    strong_boundaries = [
-        "heading_open",
-        "table_open",
-        "fence",
-        "code_block",
-        "blockquote_open",
-        "bullet_list_open",
-        "ordered_list_open"
-    ]
-    return unit.node_type in strong_boundaries
-
-def _build_context(units: List[TranslationUnit]) -> Dict[str, Any]:
-    """Собирает контекст для чанка (текущие заголовки, родители)."""
-    context = {
-        "current_headings": [],
-        "parent_types": [],
-        "list_level": 0
-    }
-    
-    for unit in units:
-        if unit.node_type.startswith("heading"):
-            level = int(unit.node_type.split("_")[1])
-            context["current_headings"].append({
-                "level": level,
-                "text": unit.extracted_text
-            })
-        
-        if unit.node_type in ["bullet_list_open", "ordered_list_open"]:
-            context["list_level"] += 1
-    
-    return context
-
-def _detect_boundaries(units: List[TranslationUnit]) -> ChunkBoundaries:
-    """Определяет границы чанка."""
-    boundaries = ChunkBoundaries()
-    
-    if units:
-        first_unit = units[0]
-        last_unit = units[-1]
-        
-        boundaries.starts_with_heading = first_unit.node_type.startswith("heading")
-        boundaries.ends_with_heading = last_unit.node_type.startswith("heading")
-        boundaries.in_list = any(
-            u.node_type in ["bullet_list_open", "ordered_list_open"]
-            for u in units
-        )
-        boundaries.in_table = any(
-            u.node_type.startswith("table") or u.node_type.startswith("tr")
-            for u in units
-        )
-        boundaries.in_blockquote = any(
-            u.node_type.startswith("blockquote")
-            for u in units
-        )
-    
-    return boundaries
 ```
 
----
-
-## 6. Восстановление AST
-
-### 6.1 Процесс восстановления
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                  AST Reconstruction Process                   │
-├─────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Загрузка оригинального AST                                │
-│  2. Замена текста в узлах на переведенный                     │
-│  3. Восстановление плейсхолдеров                              │
-│  4. Сохранение структуры и атрибутов                          │
-│  5. Валидация AST                                             │
-│  6. Рендеринг в Markdown                                      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 6.2 Алгоритм восстановления
+### 5.3 Безопасное разбиение длинных предложений
 
 ```python
-def reconstruct_ast(
-    original_ast: SyntaxTreeNode,
-    translated_units: Dict[str, TranslationUnit],
-    placeholder_manager: PlaceholderManager
-) -> SyntaxTreeNode:
+def _safe_split_long_sentence(self, sentence: str) -> List[str]:
     """
-    Восстанавливает AST с переведенным текстом.
-    
-    Args:
-        original_ast: Оригинальное AST
-        translated_units: Словарь переведенных единиц {node_id: unit}
-        placeholder_manager: Менеджер плейсхолдеров
-        
-    Returns:
-        Восстановленное AST
-    """
-    # Создаем копию AST для модификации
-    new_ast = deepcopy(original_ast)
-    
-    # Рекурсивно обходим и заменяем текст
-    _replace_text_in_ast(new_ast, translated_units, placeholder_manager)
-    
-    return new_ast
+    Разбивает длинное предложение на части, сохраняя плейсхолдеры целыми.
 
-def _replace_text_in_ast(
-    node: SyntaxTreeNode,
-    translated_units: Dict[str, TranslationUnit],
-    placeholder_manager: PlaceholderManager
+    Использует regex: r"(\{[^}]+\})|(\s+)|(\S+)"
+    - Группирует плейсхолдеры как единые токены
+    - Разделяет по пробелам
+    - Сохраняет отдельные слова
+    """
+```
+
+### 5.4 Алгоритм слияния переводов (Merger)
+
+```python
+def merge_translations(
+    self,
+    chunks: List[MarkdownChunk],
+    translated_texts: List[str],
+    units: List[TranslationUnit]
 ):
-    """Рекурсивно заменяет текст в узлах AST."""
-    
-    # Проверяем, есть ли переведенный текст для этого узла
-    if node.type == "text" and hasattr(node, "node_id"):
-        unit = translated_units.get(node.node_id)
-        if unit and unit.translated_text:
-            # Восстанавливаем плейсхолдеры в переведенном тексте
-            restored_text = _restore_placeholders(
-                unit.translated_text,
-                placeholder_manager
-            )
-            node.content = restored_text
-    
-    # Рекурсивно обрабатываем дочерние узлы
-    for child in node.children or []:
-        _replace_text_in_ast(child, translated_units, placeholder_manager)
-
-def _restore_placeholders(
-    text: str,
-    placeholder_manager: PlaceholderManager
-) -> str:
     """
-    Восстанавливает плейсхолдеры в тексте.
-    
-    Args:
-        text: Текст с плейсхолдерами
-        placeholder_manager: Менеджер плейсхолдеров
-        
-    Returns:
-        Текст с восстановленными плейсхолдерами
-    """
-    # Регулярное выражение для поиска плейсхолдеров
-    placeholder_pattern = r"\{(\w+):([^}:]+)(?::([^}]+))?\}"
-    
-    def replace_match(match):
-        placeholder_type = match.group(1)
-        placeholder_id = match.group(2)
-        content = match.group(3) if match.group(3) else ""
-        
-        placeholder = placeholder_manager.placeholders.get(placeholder_id)
-        if not placeholder:
-            return match.group(0)  # Возвращаем оригинальный плейсхолдер
-        
-        # Восстанавливаем оригинальный контент
-        return placeholder.original_content
-    
-    return re.sub(placeholder_pattern, replace_match, text)
-```
+    Алгоритм обратной сборки:
 
-### 6.3 Рендеринг в Markdown
-
-```python
-def render_ast_to_markdown(ast: SyntaxTreeNode) -> str:
+    1. Создаем мапу unit_id -> TranslationUnit
+    2. Инициализируем translated_text="" для всех нуждающихся в переводе
+    3. Для каждого чанка и соответствующего ответа NLLB:
+       a. Разбиваем ответ по \x1E на сегменты
+       b. Если количество сегментов совпадает - мапим по порядку
+       c. Если не совпадает - запускаем fallback по маскам-якорям
+    4. Fallback алгоритм:
+       a. Ищем маски {prefix_id} в переведенном тексте
+       b. Находим匹配的 сегмент чанка по маске
+       c. Привязываем перевод к соответствующему unit
+       d. Несопоставленные сегменты распределяем хронологически
     """
-    Рендерит AST обратно в Markdown.
-    
-    Args:
-        ast: AST для рендеринга
-        
-    Returns:
-        Markdown строка
-    """
-    # Используем markdown-it-py для рендеринга
-    from markdown_it import MarkdownIt
-    
-    md = MarkdownIt("commonmark")
-    tokens = _ast_to_tokens(ast)
-    return md.renderer.render(tokens, md.options, {})
-
-def _ast_to_tokens(node: SyntaxTreeNode) -> List[Any]:
-    """Конвертирует AST обратно в токены."""
-    tokens = []
-    
-    # Создаем токен для текущего узла
-    token = _create_token_from_node(node)
-    tokens.append(token)
-    
-    # Добавляем дочерние токены
-    for child in node.children or []:
-        tokens.extend(_ast_to_tokens(child))
-    
-    # Добавляем закрывающий токен для парных узлов
-    if node.type.endswith("_open"):
-        close_type = node.type.replace("_open", "_close")
-        close_token = _create_closing_token(close_type)
-        tokens.append(close_token)
-    
-    return tokens
 ```
 
 ---
 
-## 7. Обработка edge cases
+## 6. Восстановление AST (State Machine)
+
+### 6.1 Архитектура реконструктора
+
+```python
+class MarkdownReconstructor:
+    """State Machine для линейной обратной сборки Markdown."""
+
+    def __init__(self):
+        self._buffer: List[str] = []
+        self._block_stack: List[Dict[str, Any]] = []
+        # Стек хранит: {"type": "...", "marker": "...", "is_first_paragraph": True}
+```
+
+### 6.2 Алгоритм реконструкции
+
+```python
+def reconstruct(self, units: List[TranslationUnit]) -> str:
+    """
+    Линейный обход плоского списка TranslationUnit:
+
+    1. STRUCTURAL_IGNORE:
+       - fence/code_block: пишем напрямую в буфер с префиксом вложенности
+       - hr: пишем "---"
+       - list/table/blockquote open: пушим в стек
+       - list/table/blockquote close: снимаем со стека
+
+    2. CONTEXT_BLOCK:
+       - dt/dd open: пушим в стек для префиксации
+       - heading: добавляем "#" * level
+       - paragraph: восстанавливаем инлайн-плейсхолдеры
+       - dt/dd close: снимаем со стека
+
+    3. SPECIAL_CASE:
+       - front_matter: оборачиваем в "---"
+
+    4. Префиксация строк:
+       - Вычисляем отступы по стеку (цитаты "> ", списки "    ")
+       - Для list_item добавляем маркер "- " или "1. "
+       - Для dd добавляем ": "
+    """
+```
+
+### 6.3 Восстановление инлайн-плейсхолдеров
+
+```python
+def _restore_inline_placeholders(self, text: str, unit: TranslationUnit) -> str:
+    """
+    Двухэтапное восстановление:
+
+    Этап 1: Парные теги (regex рекурсивно)
+    - pattern: r"\{\s*([a-zA-Z]+)_(\d+)\s*\}(.*?)\{\s*/\1_\2\s*\}"
+    - Заменяем {lnk_1}текст{/lnk_1} на [текст](url)
+    - Заменяем {s_1}текст{/s_1} на **текст**
+
+    Этап 2: Одиночные теги
+    - pattern: r"\{\s*([a-zA-Z0-9_/]+)\s*\}"
+    - Заменяем {code_1} на `code`
+    - Заменяем {math_1} на $formula$
+    - Заменяем {br_1} на \n или <br>
+    - Заменяем {img_1} на ![alt](src)
+    """
+```
+
+### 6.4 Префиксация вложенности
+
+```python
+def _get_current_prefix(self, for_block_start: bool = False) -> Tuple[str, str]:
+    """
+    Вычисляет префикс строки на основе стека:
+
+    - blockquote: добавляет "> "
+    - bullet_list/ordered_list: добавляет "    " для уровней > 1
+    - list_item: добавляет "- " или "1. " для первой строки
+    - dd: добавляет ": " для первой строки, "  " для последующих
+    """
+```
+
+---
+
+## 7. Обработка edge cases (из реализации и плана)
 
 ### 7.1 Вложенные ссылки и изображения
 
-**Проблема:** Markdown не поддерживает вложенные ссылки, но изображения могут быть внутри ссылок.
-
-**Решение:**
-```python
-# ![alt](image.png) внутри [text](url)
-# Обрабатываем как отдельные плейсхолдеры
-"{link:1:{image:2:alt text} link text}"
+**Решение:** Парные плейсхолдеры с рекурсивной заменой
+```
+{lnk_1}{img_2}{/img_2} текст ссылки{/lnk_1}
 ```
 
 ### 7.2 Экранированные символы
 
-**Проблема:** Экранированные символы (`\*`, `\#`) не должны обрабатываться как разметка.
-
-**Решение:**
-```python
-def handle_escaped_chars(text: str) -> str:
-    """Обрабатывает экранированные символы."""
-    # Сохраняем экранированные символы как плейсхолдеры
-    text = re.sub(r"\\([*_`{}\[\]()#+\-.!])", r"{escape:\1}", text)
-    return text
-```
+**Решение:** markdown-it-py автоматически обрабатывает экранирование, контент передается как text узлы
 
 ### 7.3 Многоязычный контент
 
-**Проблема:** Документ может содержать текст на разных языках.
-
-**Решение:**
-```python
-def detect_language_mix(text: str) -> List[str]:
-    """Определяет языки в тексте."""
-    # Используем библиотеку для определения языка
-    from langdetect import detect_langs
-    
-    try:
-        langs = detect_langs(text)
-        return [lang.lang for lang in langs if lang.prob > 0.3]
-    except:
-        return []
-```
+**Решение:** pysbd определяет язык и сегментирует предложения соответственно
 
 ### 7.4 Длинные слова и URL
 
-**Проблема:** Длинные слова (URL, email) могут превышать лимит токенов.
-
-**Решение:**
-```python
-def split_long_tokens(text: str, max_length: int = 100) -> str:
-    """Разбивает длинные токены на части."""
-    words = text.split()
-    result = []
-    
-    for word in words:
-        if len(word) > max_length:
-            # Разбиваем длинное слово
-            parts = [word[i:i+max_length] for i in range(0, len(word), max_length)]
-            result.extend(parts)
-        else:
-            result.append(word)
-    
-    return " ".join(result)
-```
+**Решение:** _safe_split_long_sentence защищает плейсхолдеры, разбивает по пробелам
 
 ### 7.5 Математические формулы с текстом
 
-**Проблема:** Формулы могут содержать текстовые пояснения.
-
-**Решение:**
-```python
-# $E = mc^2$ where $E$ is energy
-# Переводим только текстовые части
-"{math:1:E = mc^2} where {math:2:E} is energy"
-```
+**Решение:** INLINE_PROTECT стратегия - вся формула защищается одним плейсхолдером
 
 ### 7.6 Ссылки с title
 
-**Проблема:** Ссылки могут иметь title атрибут.
-
-**Решение:**
-```python
-# [text](url "title")
-# Переводим text и title, сохраняем url
-"{link:1:url:text:title}"
-```
+**Решение:** Сохраняем в original_markup как dict {"href": "...", "title": "..."}
 
 ### 7.7 Вложенные списки
 
-**Проблема:** Вложенные списки должны сохранять уровень вложенности.
-
-**Решение:**
-```python
-def preserve_list_nesting(node: SyntaxTreeNode, level: int = 0):
-    """Сохраняет уровень вложенности списков."""
-    if node.type in ["bullet_list_open", "ordered_list_open"]:
-        level += 1
-    
-    # Сохраняем уровень в метаданных узла
-    node.list_level = level
-    
-    for child in node.children or []:
-        preserve_list_nesting(child, level)
-```
+**Решение:** Стек block_stack отслеживает уровень, добавляет "    " отступ для каждого уровня
 
 ### 7.8 Таблицы с многострочными ячейками
 
-**Проблема:** Ячейки таблиц могут содержать несколько строк.
+**Текущее состояние:** Структура таблиц сохраняется через STRUCTURAL_IGNORE, но контент ячеек требует доработки
 
-**Решение:**
-```python
-def handle_multiline_table_cells(cell_content: str) -> str:
-    """Обрабатывает многострочные ячейки таблиц."""
-    # Сохраняем переносы строк внутри ячеек
-    cell_content = cell_content.replace("\n", "<br>")
-    return cell_content
-```
+**Рекомендация:** Обрабатывать td/th как CONTEXT_BLOCK с восстановлением переносов строк
 
 ### 7.9 HTML внутри Markdown
 
-**Проблема:** HTML может содержать Markdown-подобный текст.
-
-**Решение:**
-```python
-def handle_html_content(node: SyntaxTreeNode):
-    """Обрабатывает HTML контент."""
-    if node.type in ["html_inline", "html_block"]:
-        # Не парсим содержимое HTML как Markdown
-        node.skip_parsing = True
-```
+**Решение:** html_inline и html_block как INLINE_PROTECT/STRUCTURAL_IGNORE
 
 ### 7.10 Reference-style ссылки
 
-**Проблема:** Reference-style ссылки `[text][id]` с определениями в конце.
+**Текущее состояние:** Не реализовано явно
 
-**Решение:**
-```python
-# [text][id]
-# Переводим только text, сохраняем id
-"{link_ref:id:text}"
+**Рекомендация:** Добавить обработку link_reference_definition как STRUCTURAL_IGNORE
 
-# [id]: url "title"
-# Сохраняем как есть
-```
+### 7.11 Task lists
+
+**Текущее состояние:** tasklist_item как INLINE_PROTECT
+
+**Рекомендация:** Восстанавливать чекбокс `- [x]` в reconstructor
+
+### 7.12 Footnotes
+
+**Текущее состояние:** footnote_ref как INLINE_PROTECT, footnote_block как STRUCTURAL_IGNORE
+
+**Рекомендация:** Обеспечить корректную нумерацию при восстановлении
 
 ---
 
@@ -647,217 +487,174 @@ def handle_html_content(node: SyntaxTreeNode):
 | Тип ошибки | Описание | Обработка |
 |------------|----------|-----------|
 | `ParseError` | Ошибка парсинга Markdown | Возвращаем оригинальный текст |
-| `TranslationError` | Ошибка перевода | Пропускаем чанк, логируем |
-| `PlaceholderMismatch` | Несоответствие плейсхолдеров | Восстанавливаем оригинальный текст |
-| `TokenLimitExceeded` | Превышен лимит токенов | Разбиваем на меньшие чанки |
-| `InvalidAST` | Невалидное AST | Валидируем перед рендерингом |
+| `TranslationError` | Ошибка перевода NLLB | Пропускаем чанк, логируем |
+| `PlaceholderMismatch` | Несоответствие плейсхолдеров | Fallback alignment по маскам |
+| `TokenLimitExceeded` | Превышен лимит токенов | _safe_split_long_sentence |
+| `SegmentDrop` | NLLB пропустил сегмент | Хронологическое распределение + флаг has_errors |
 
-### 8.2 Валидация AST
+### 8.2 Валидация AST (рекомендация)
 
 ```python
 def validate_ast(ast: SyntaxTreeNode) -> List[str]:
     """
-    Валидирует AST на корректность.
-    
-    Args:
-        ast: AST для валидации
-        
-    Returns:
-        Список ошибок (пустой если нет ошибок)
+    Проверки:
+    - Баланс открывающих/закрывающих тегов
+    - Корректная вложенность списков
+    - Структура таблиц (thead before tbody)
     """
-    errors = []
-    
-    # Проверяем баланс открывающих/закрывающих тегов
-    if not _check_tag_balance(ast):
-        errors.append("Unbalanced tags in AST")
-    
-    # Проверяем вложенность списков
-    if not _check_list_nesting(ast):
-        errors.append("Invalid list nesting")
-    
-    # Проверяем структуру таблиц
-    if not _check_table_structure(ast):
-        errors.append("Invalid table structure")
-    
-    return errors
-
-def _check_tag_balance(node: SyntaxTreeNode) -> bool:
-    """Проверяет баланс открывающих/закрывающих тегов."""
-    open_tags = []
-    
-    def check_node(n: SyntaxTreeNode):
-        if n.type.endswith("_open"):
-            open_tags.append(n.type)
-        elif n.type.endswith("_close"):
-            if not open_tags:
-                return False
-            open_tags.pop()
-        return True
-    
-    # Обходим все узлы
-    for child in node.walk():
-        if not check_node(child):
-            return False
-    
-    return len(open_tags) == 0
 ```
 
-### 8.3 Обработка ошибок перевода
+### 8.3 Обработка ошибок в Merger
 
 ```python
-class TranslationErrorManager:
-    """Управляет ошибками перевода."""
-    
-    def __init__(self):
-        self.errors: List[TranslationError] = []
-        self.error_counts: Dict[str, int] = {}
-    
-    def handle_error(
-        self,
-        error: Exception,
-        unit: Optional[TranslationUnit] = None,
-        chunk: Optional[TranslationChunk] = None
-    ):
-        """Обрабатывает ошибку перевода."""
-        error_type = type(error).__name__
-        self.error_counts[error_type] = self.error_counts.get(error_type, 0) + 1
-        
-        translation_error = TranslationError(
-            error_type=error_type,
-            message=str(error),
-            unit_id=unit.node_id if unit else None,
-            chunk_id=chunk.chunk_id if chunk else None,
-            timestamp=datetime.now()
-        )
-        
-        self.errors.append(translation_error)
-        
-        # Логируем ошибку
-        logger.error(f"Translation error: {error_type} - {error}")
-        
-        # Решение в зависимости от типа ошибки
-        if error_type == "TokenLimitExceeded":
-            self._handle_token_limit_error(unit)
-        elif error_type == "PlaceholderMismatch":
-            self._handle_placeholder_mismatch(unit)
-        else:
-            self._handle_generic_error(unit)
-    
-    def _handle_token_limit_error(self, unit: TranslationUnit):
-        """Обрабатывает ошибку превышения лимита токенов."""
-        # Разбиваем единицу на меньшие части
-        pass
-    
-    def _handle_placeholder_mismatch(self, unit: TranslationUnit):
-        """Обрабатывает ошибку несоответствия плейсхолдеров."""
-        # Восстанавливаем оригинальный текст
-        unit.translated_text = unit.original_text
-        unit.has_errors = True
-    
-    def _handle_generic_error(self, unit: TranslationUnit):
-        """Обрабатывает общую ошибку."""
-        # Пропускаем перевод, сохраняем оригинальный текст
-        if unit:
-            unit.translated_text = unit.original_text
-            unit.has_errors = True
+def _fallback_align_segments(...):
+    """
+    Аварийный алгоритм:
+    1. Ищем маски-якоря в переведенном тексте
+    2. Матчим с сегментами чанка
+    3. Несопоставленные распределяем хронологически
+    4. Потерянные сегменты помечаем has_errors=True
+    """
 ```
 
 ---
 
 ## 9. Производительность и оптимизация
 
-### 9.1 Кэширование
+### 9.1 Кэширование (рекомендация)
 
 ```python
-from functools import lru_cache
-
-@lru_cache(maxsize=1000)
-def parse_markdown_cached(markdown_text: str) -> SyntaxTreeNode:
-    """Кэширует результат парсинга Markdown."""
-    md = create_markdown_parser()
-    tokens = md.parse(markdown_text)
-    return SyntaxTreeNode(tokens)
+@lru_cache(maxsize=32)
+def get_segmenter(nllb_lang_code: str):
+    """Кэширует pysbd.Segmenter по языку."""
 ```
 
-### 9.2 Параллельный перевод
+### 9.2 Токенизация
 
 ```python
-from concurrent.futures import ThreadPoolExecutor
-
-def translate_chunks_parallel(
-    chunks: List[TranslationChunk],
-    translator: Any,
-    max_workers: int = 4
-) -> Dict[str, str]:
-    """Переводит чанки параллельно."""
-    
-    def translate_chunk(chunk: TranslationChunk) -> tuple:
-        translated_text = translator.translate(chunk.text)
-        return (chunk.chunk_id, translated_text)
-    
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        results = executor.map(translate_chunk, chunks)
-    
-    return dict(results)
+def count_tokens(tokenizer, text: str) -> int:
+    """Вызывает tokenizer один раз, возвращает len(input_ids)."""
 ```
 
 ### 9.3 Пакетная обработка
 
-```python
-def batch_translate(
-    documents: List[str],
-    batch_size: int = 10
-) -> List[str]:
-    """Переводит документы пакетами."""
-    translated_docs = []
-    
-    for i in range(0, len(documents), batch_size):
-        batch = documents[i:i + batch_size]
-        # Параллельный перевод батча
-        batch_results = translate_chunks_parallel(batch)
-        translated_docs.extend(batch_results)
-    
-    return translated_docs
-```
+**Текущее состояние:** Последовательный вызов engine.translate для каждого чанка
+
+**Рекомендация:** Добавить batch_translate API для параллельной обработки
 
 ---
 
 ## 10. Тестирование
 
-### 10.1 Тестовые сценарии
+### 10.1 Покрытие тестами (из реализации)
 
-| Сценарий | Описание | Ожидаемый результат |
-|----------|----------|---------------------|
-| `headings` | Заголовки с форматированием | Уровни сохранены, текст переведен |
-| `tables` | Таблицы с кодом и ссылками | Структура сохранена, код не переведен |
-| `links` | Ссылки с title | URL сохранен, текст переведен |
-| `fenced-code` | Fenced code blocks | Код сохранен как есть |
-| `images` | Изображения с alt | URL сохранен, alt переведен |
-| `html-blocks` | HTML блоки | HTML сохранен как есть |
-| `inline-html` | Inline HTML | HTML сохранен как есть |
-| `nested-lists` | Вложенные списки | Уровни вложенности сохранены |
-| `mixed-formatting` | Смешанное форматирование | Все форматирование сохранено |
-| `escaped-markdown` | Экранированный Markdown | Экранирование сохранено |
-| `malformed-markdown` | Невалидный Markdown | Обработка без падения |
-| `yaml-frontmatter` | YAML frontmatter | Ключи сохранены, значения переведены |
-| `math-expressions` | Математические формулы | Формулы сохранены как есть |
-| `footnotes` | Сноски | Маркеры сохранены, текст переведен |
-| `reference-links` | Reference-style ссылки | ID сохранены, текст переведен |
-| `rtl-languages` | RTL языки | Направление текста сохранено |
-| `huge-documents` | Большие документы | Разбивка на чанки работает |
-| `unicode-punctuation` | Unicode пунктуация | Пунктуация сохранена |
-| `softbreak-hardbreak` | Переносы строк | Тип переноса сохранен |
-| `task-lists` | Списки задач | Статус задач сохранен |
-| `definition-lists` | Списки определений | Структура сохранена |
+| Компонент | Тесты | Покрытие |
+|-----------|-------|----------|
+| ASTWalker | 6 тестов | plain paragraph, inline formatting, nested blocks, front matter, multiple contexts, structural inside context |
+| PlaceholderManager | 7 тестов | code, math, paired tags stack, link attributes, image, unbalanced closing, unknown type |
+| MarkdownChunker | 9 тестов | greedy packing, max tokens split, mask protection, indivisible token, merge ideal, merge fallback by masks, merge chronological drop, empty segments, empty units |
+| MarkdownReconstructor | 9 тестов | plain paragraph, heading, inline strong, links/images, nested blockquote, front matter, nested lists, definition lists, fence inside blockquote |
+| Integration | 4 теста | full pipeline, empty inputs |
 
-### 10.2 Юнит-тесты
+### 10.2 Рекомендуемые дополнительные тесты
 
-## 12. Заключение
+| Сценарий | Описание | Приоритет |
+|----------|----------|-----------|
+| `tables` | Таблицы с кодом и ссылками | Высокий |
+| `task-lists` | Списки задач с чекбоксами | Высокий |
+| `footnotes` | Сноски с маркерами | Средний |
+| `reference-links` | Reference-style ссылки | Средний |
+| `html-blocks` | HTML блоки внутри Markdown | Средний |
+| `escaped-markdown` | Экранированный Markdown | Низкий |
+| `malformed-markdown` | Невалидный Markdown | Низкий |
+| `huge-documents` | Большие документы (>10K токенов) | Высокий |
+| `unicode-punctuation` | Unicode пунктуация | Низкий |
+| `rtl-languages` | RTL языки (арабский, иврит) | Низкий |
 
-Система перевода Markdown с сохранением форматирования обеспечивает:
+---
 
-1. **Полное сохранение структуры** - все элементы Markdown сохраняют свою структуру
-2. **Интеллектуальное чанкование** - разбиение на чанки с учетом границ и контекста
-3. **Управление плейсхолдерами** - надежная система замены непереводимых элементов
-4. **Обработка edge cases** - поддержка сложных сценариев и ошибок
-6. **Производительность** - кэширование, параллельная обработка, пакетная обработка (Next steps
+## 11. Известные проблемы и технические долги
+
+### 11.1 Несоответствие тестов и реализации
+
+**Проблема:** В тестах используется разделитель ` ||| `, но в реализации `\x1e`
+
+**Решение:** Обновить тесты на использование `\x1e`
+
+### 11.2 Обработка таблиц
+
+**Проблема:** Таблицы обрабатываются как STRUCTURAL_IGNORE, но контент ячеек (th/td) должен переводиться
+
+**Решение:** Убедиться что th_open/close и td_open/close правильно классифицированы как CONTEXT_BLOCK
+
+### 11.3 Tasklist восстановление
+
+**Проблема:** tasklist_item защищается плейсхолдером, но не восстанавливается в reconstructor
+
+**Решение:** Добавить обработку в _restore_inline_placeholders
+
+### 11.4 Отсутствие валидации
+
+**Проблема:** Нет явной валидации AST перед рендерингом
+
+**Решение:** Добавить validate_ast() вызов перед reconstruct()
+
+### 11.5 Обработка ошибок перевода
+
+**Проблема:** Минимальная обработка ошибок NLLB
+
+**Решение:** Добавить retry logic, circuit breaker, detailed logging
+
+---
+
+## 12. Roadmap улучшений
+
+### Фаза 1: Стабилизация (недели 1-2)
+- [ ] Исправить несоответствие тестов (`|||` → `\x1e`)
+- [ ] Добавить тесты для таблиц
+- [ ] Добавить тесты для task lists
+- [ ] Реализовать валидацию AST
+- [ ] **Добавить логирование в uvicorn.error**:
+  - Логгер: `logger = logging.getLogger("uvicorn.error")`
+  - Ключевые точки: парсинг, обход AST, чанкование, перевод, реконструкция
+
+### Фаза 2: Функциональность (недели 3-4)
+- [ ] Полная поддержка таблиц (многострочные ячейки)
+- [ ] Восстановление tasklist checkbox
+- [ ] Поддержка reference-style ссылок
+- [ ] Поддержка footnotes с нумерацией
+
+### Фаза 3: Производительность (недели 5-6)
+- [ ] Batch translation API
+- [ ] Parallel chunk processing
+- [ ] Advanced caching
+
+### Фаза 4: Надежность (недели 7-8)
+- [ ] Retry logic для NLLB
+- [ ] Circuit breaker pattern
+- [ ] Comprehensive error logging
+- [ ] Metrics collection
+
+---
+
+## 13. Заключение
+
+Текущая реализация представляет собой зрелую систему с четкой архитектурой:
+
+**Сильные стороны:**
+1. ✅ Четкое разделение ответственности между компонентами
+2. ✅ Стековая архитектура для вложенных контекстов
+3. ✅ Надежная система плейсхолдеров с LIFO для парных тегов
+4. ✅ Умное чанкование с защитой масок
+5. ✅ Fallback алгоритм для аномалий NLLB
+6. ✅ State machine для реконструкции
+7. ✅ Хорошее тестовое покрытие основных сценариев
+
+**Области улучшения:**
+1. ⚠️ Несогласованность тестов с реализацией
+2. ⚠️ Неполная поддержка таблиц
+3. ⚠️ Отсутствует валидация AST
+4. ⚠️ Минимальная обработка ошибок
+5. ⚠️ Нет batch/parallel обработки
+
+**Рекомендация:** Сфокусироваться на Фазе 1 (стабилизация) перед добавлением новой функциональности.
