@@ -26,12 +26,13 @@ class MarkdownTranslator:
     """
 
     def __init__(
-        self, translation_engine: TranslationEngine, src_lang: str, tgt_lang: str
+        self, text: str, src_lang: str, tgt_lang: str, engine: TranslationEngine
     ):
-        self.engine = translation_engine
-        self.tokenizer = self.engine.tokenizer
+        self.text = text
         self.src_lang = src_lang
         self.tgt_lang = tgt_lang
+        self.engine = engine
+        self.tokenizer = self.engine.tokenizer
 
         # Инициализируем компоненты архитектуры
         self.parser = create_markdown_parser()
@@ -50,18 +51,16 @@ class MarkdownTranslator:
         self.translated_text: str = ""
         self.units: List[TranslationUnit] = []
 
-    def process(self, markdown_text: str) -> str:
+    def process(self) -> str:
         """Главный метод конвейера (вызывается пользователем)."""
-        if not markdown_text.strip():
+        if not self.text.strip():
             return ""
 
-        self.source_text = markdown_text
-
         logger.info("Starting Markdown translation pipeline")
-        logger.debug("Input text length: %d characters", len(markdown_text))
+        logger.debug("Input text length: %d characters", len(self.text))
 
         # Шаг 1: Формируем синтаксическое дерево (AST)
-        tokens = self.parser.parse(self.source_text)
+        tokens = self.parser.parse(self.text)
         ast_root = SyntaxTreeNode(tokens)
 
         logger.debug(

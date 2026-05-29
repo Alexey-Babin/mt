@@ -1,6 +1,6 @@
 """Tests for translation_service.py"""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -13,6 +13,7 @@ def mock_engine():
     """Create a mock translation engine."""
     engine = MagicMock()
     engine.translate = MagicMock(return_value="Translated text")
+    engine.tokenizer = MagicMock()
     return engine
 
 
@@ -22,18 +23,28 @@ class TestTranslationService:
     def test_translate_plain_text(self, mock_engine):
         """Test translation of plain text."""
         service = TranslationService(mock_engine)
+        with patch(
+            "mt_server.plain_text_translator.PlainTextTranslator"
+        ) as MockTranslator:
+            mock_translator = MagicMock()
+            mock_translator.process.return_value = "Translated text"
+            MockTranslator.return_value = mock_translator
 
-        result = service.translate(
-            text="Hello world",
-            src_lang="eng_Latn",
-            tgt_lang="rus_Cyrl",
-            format=TextFormat.PLAIN,
-        )
+            result = service.translate(
+                text="Hello world",
+                src_lang="eng_Latn",
+                tgt_lang="rus_Cyrl",
+                format=TextFormat.PLAIN,
+            )
 
-        assert result == "Translated text"
-        mock_engine.translate.assert_called_once_with(
-            "Hello world", "eng_Latn", "rus_Cyrl"
-        )
+            assert result == "Translated text"
+            MockTranslator.assert_called_once_with(
+                text="Hello world",
+                src_lang="eng_Latn",
+                target_lang="rus_Cyrl",
+                engine=mock_engine,
+            )
+            mock_translator.process.assert_called_once()
 
     def test_translate_empty_text(self, mock_engine):
         """Test translation of empty text returns empty string."""
@@ -46,6 +57,7 @@ class TestTranslationService:
         )
 
         assert result == ""
+        # No translator should be created for empty text
         mock_engine.translate.assert_not_called()
 
     def test_translate_whitespace_only_text(self, mock_engine):
@@ -65,76 +77,95 @@ class TestTranslationService:
         """Test auto-detection of plain text format."""
         service = TranslationService(mock_engine)
 
-        result = service.translate(
-            text="Hello world",
-            src_lang="eng_Latn",
-            tgt_lang="rus_Cyrl",
-            format=TextFormat.AUTO,
-        )
+        with patch(
+            "mt_server.plain_text_translator.PlainTextTranslator"
+        ) as MockTranslator:
+            mock_translator = MagicMock()
+            mock_translator.process.return_value = "Translated text"
+            MockTranslator.return_value = mock_translator
 
-        assert result == "Translated text"
-        # Should call engine translate for plain text
-        mock_engine.translate.assert_called_once()
+            result = service.translate(
+                text="Hello world",
+                src_lang="eng_Latn",
+                tgt_lang="rus_Cyrl",
+                format=TextFormat.AUTO,
+            )
+
+            assert result == "Translated text"
+            MockTranslator.assert_called_once()
+            mock_translator.process.assert_called_once()
 
     def test_translate_auto_detect_markdown(self, mock_engine):
         """Test auto-detection of markdown format."""
         service = TranslationService(mock_engine)
 
-        result = service.translate(
-            text="# Header\n\n**Bold text**",
-            src_lang="eng_Latn",
-            tgt_lang="rus_Cyrl",
-            format=TextFormat.AUTO,
-        )
+        with patch(
+            "mt_server.markdown2.markdown_translator.MarkdownTranslator"
+        ) as MockTranslator:
+            mock_translator = MagicMock()
+            mock_translator.process.return_value = "Translated markdown"
+            MockTranslator.return_value = mock_translator
 
-        # Markdown is not implemented yet, should fallback to plain
-        assert result == "Translated text"
+            result = service.translate(
+                text="# Header\n\n**Bold text**",
+                src_lang="eng_Latn",
+                tgt_lang="rus_Cyrl",
+                format=TextFormat.AUTO,
+            )
 
-    def test_translate_markdown_not_implemented(self, mock_engine):
-        """Test that markdown format raises NotImplementedError when no fallback."""
-        service = TranslationService(mock_engine)
-
-        # When format is explicitly MARKDOWN and engine raises error,
-        # the service should NOT fallback (fallback only happens with AUTO)
-        # But currently the service catches the error and falls back
-        # This test verifies the current behavior
-        result = service.translate(
-            text="# Header",
-            src_lang="eng_Latn",
-            tgt_lang="rus_Cyrl",
-            format=TextFormat.MARKDOWN,
-        )
-
-        # Should fallback to plain text translation
-        assert result == "Translated text"
+            assert result == "Translated markdown"
+            MockTranslator.assert_called_once()
+            mock_translator.process.assert_called_once()
 
     def test_translate_fallback_on_markdown_error(self, mock_engine):
         """Test fallback to plain text on markdown error."""
         service = TranslationService(mock_engine)
 
-        result = service.translate(
-            text="# Header",
-            src_lang="eng_Latn",
-            tgt_lang="rus_Cyrl",
-            format=TextFormat.AUTO,  # Will detect as markdown
-        )
+        with patch(
+            "mt_server.markdown2.markdown_translator.MarkdownTranslator"
+        ) as MockMarkdownTranslator:
+            MockMarkdownTranslator.side_effect = Exception("Markdown error")
 
-        # Should fallback to plain text translation
-        assert result == "Translated text"
+            with patch(
+                "mt_server.plain_text_translator.PlainTextTranslator"
+            ) as MockPlainTranslator:
+                mock_plain_translator = MagicMock()
+                mock_plain_translator.process.return_value = "Fallback translated"
+                MockPlainTranslator.return_value = mock_plain_translator
+
+                result = service.translate(
+                    text="# Header",
+                    src_lang="eng_Latn",
+                    tgt_lang="rus_Cyrl",
+                    format=TextFormat.AUTO,  # Will detect as markdown
+                )
+
+                # Should fallback to plain text translation
+                assert result == "Fallback translated"
+                MockPlainTranslator.assert_called_once()
+                mock_plain_translator.process.assert_called_once()
 
     def test_translate_with_explicit_markdown_format(self, mock_engine):
         """Test translation with explicit markdown format."""
         service = TranslationService(mock_engine)
 
-        result = service.translate(
-            text="# Header",
-            src_lang="eng_Latn",
-            tgt_lang="rus_Cyrl",
-            format=TextFormat.MARKDOWN,
-        )
+        with patch(
+            "mt_server.markdown2.markdown_translator.MarkdownTranslator"
+        ) as MockTranslator:
+            mock_translator = MagicMock()
+            mock_translator.process.return_value = "Translated markdown"
+            MockTranslator.return_value = mock_translator
 
-        # Should fallback to plain text translation due to NotImplementedError
-        assert result == "Translated text"
+            result = service.translate(
+                text="# Header",
+                src_lang="eng_Latn",
+                tgt_lang="rus_Cyrl",
+                format=TextFormat.MARKDOWN,
+            )
+
+            assert result == "Translated markdown"
+            MockTranslator.assert_called_once()
+            mock_translator.process.assert_called_once()
 
     def test_resolve_format_explicit_plain(self, mock_engine):
         """Test format resolution with explicit plain format."""

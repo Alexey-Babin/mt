@@ -8,7 +8,6 @@ from transformers import AutoModelForSeq2SeqLM, NllbTokenizer
 
 from .config import settings
 from .languages import languages_db
-from .utils import split_into_chunks
 
 MODEL_COMPILE = settings.model_compile
 LANG_PATTERN = re.compile(r"^[a-z]{3}_[A-Z][a-z]{3}$")
@@ -83,54 +82,53 @@ class NllbTranslationEngine:
             raise ValueError(f"Unknown language: ${lang=}")
 
     @torch.inference_mode()
-    def translate(self, text, src_lang, tgt_lang) -> str:
-        chunks = split_into_chunks(
-            tokenizer=self.tokenizer, text=text, nllb_lang_code=src_lang
-        )
-        translated_chunks = []
+    def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
+        """Translate a single chunk of text from source language to target language.
+
+        Args:
+            text: A single chunk of text to translate (already segmented).
+            src_lang: Source language code (e.g., 'eng_Latn').
+            tgt_lang: Target language code (e.g., 'rus_Cyrl').
+
+        Returns:
+            Translated text chunk.
+
+        Note:
+            This method expects pre-segmented text. Use PlainTextTranslator or
+            MarkdownTranslator for full document translation with segmentation.
+        """
+        translated = ""
 
         with self._lock:
             self.tokenizer.src_lang = src_lang
             forced_bos_token_id = self.tokenizer.convert_tokens_to_ids(tgt_lang)
 
-            for chunk in chunks:
-                text = chunk.text
-                inputs = self.tokenizer(
-                    # А точно ничего не потеряется? может, max_length вынести в параметры?
-                    text.strip(),
-                    return_tensors="pt",
-                    truncation=True,
-                    max_length=settings.tokenizer_max_length,
-                ).to(self.device)
+            text_stripped = text.strip()
+            if not text_stripped:
+                return text
 
-                tokens = self.model.generate(
-                    **inputs,
-                    forced_bos_token_id=forced_bos_token_id,
-                    max_new_tokens=settings.max_new_tokens,
-                    use_cache=True,
-                )
-                translated = self.tokenizer.batch_decode(
-                    tokens, skip_special_tokens=True
-                )[0]
+            inputs = self.tokenizer(
+                text_stripped,
+                return_tensors="pt",
+                truncation=True,
+                max_length=settings.tokenizer_max_length,
+            ).to(self.device)
 
-                # Добавляем потерянные пробелы. Если не обрезать их перед подачей в модель, перевод кривой
-                if text and translated:
-                    if text[0].isspace() and not translated[0].isspace():
-                        translated = " " + translated.lstrip()
-                    if text[-1].isspace() and not translated[-1].isspace():
-                        translated = translated.rstrip() + " "
-                translated_chunks.append((chunk.block_ix, translated))
+            tokens = self.model.generate(
+                **inputs,
+                forced_bos_token_id=forced_bos_token_id,
+                max_new_tokens=settings.max_new_tokens,
+                use_cache=True,
+            )
+            translated = self.tokenizer.batch_decode(tokens, skip_special_tokens=True)[
+                0
+            ]
 
-        blocks = {}
-        for block_index, translated in translated_chunks:
-            blocks.setdefault(block_index, []).append(translated)
-        result = []
-        for block_ix in sorted(blocks):
-            result.append(" ".join(blocks[block_ix]))
+            # Restore leading/trailing whitespace if present in original
+            if text and translated:
+                if text[0].isspace() and not translated[0].isspace():
+                    translated = " " + translated.lstrip()
+                if text[-1].isspace() and not translated[-1].isspace():
+                    translated = translated.rstrip() + " "
 
-        return "\n\n".join(result)
-
-
-# Backward compatibility aliases
-Translator = NllbTranslationEngine
-TranslatorProtocol = TranslationEngineProtocol
+        return translated

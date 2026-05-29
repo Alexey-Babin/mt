@@ -79,12 +79,16 @@ def mock_translator():
     # С помощью patch переопределяем глобальную настройку max_input_tokens в процессе теста,
     # чтобы чанки резались предсказуемо независимо от файла config.py
     with patch("src.mt_server.markdown2.markdown_translator.max_input_tokens", 20):
-        translator = MarkdownTranslator(
-            translation_engine=engine,  # type: ignore
-            src_lang="eng_Latn",
-            tgt_lang="rus_Cyrl",
-        )
-        yield translator
+        # Возвращаем фабрику для создания переводчика с конкретным текстом
+        def _create_translator(text: str):
+            return MarkdownTranslator(
+                text=text,
+                src_lang="eng_Latn",
+                tgt_lang="rus_Cyrl",
+                engine=engine,  # type: ignore
+            )
+
+        yield _create_translator
 
 
 def test_markdown_translator_full_pipeline(mock_translator):
@@ -144,8 +148,9 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "Некоторый текст после."
     )
 
-    # 3. Прогоняем через главный метод оркестратора
-    result_markdown = mock_translator.process(source_markdown)
+    # 3. Создаем переводчик для конкретного текста и прогоняем через главный метод оркестратора
+    translator = mock_translator(source_markdown)
+    result_markdown = translator.process()
 
     # 4. Проверяем, что результат не пустой
     assert result_markdown is not None
@@ -178,4 +183,5 @@ def test_markdown_translator_full_pipeline(mock_translator):
 @pytest.mark.parametrize("empty_input", ["", "   ", "\n\n"])
 def test_markdown_translator_handles_empty_inputs(mock_translator, empty_input):
     """Интеграционный тест: пустые строки должны мгновенно возвращать пустую строку."""
-    assert mock_translator.process(empty_input) == ""
+    translator = mock_translator(empty_input)
+    assert translator.process() == ""

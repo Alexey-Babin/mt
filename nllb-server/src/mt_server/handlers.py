@@ -34,12 +34,20 @@ class FormatHandler(ABC):
 
 
 class PlainHandler(FormatHandler):
-    """Обработчик для plain text формата. Передает текст напрямую в движок перевода."""
+    """Обработчик для plain text формата. Использует PlainTextTranslator."""
 
     def handle(
         self, text: str, src_lang: str, tgt_lang: str, engine: TranslationEngineProtocol
     ) -> str:
-        return engine.translate(text, src_lang, tgt_lang)
+        from .plain_text_translator import PlainTextTranslator
+
+        translator = PlainTextTranslator(
+            text=text,
+            src_lang=src_lang,
+            target_lang=tgt_lang,
+            engine=engine,
+        )
+        return translator.process()
 
     @property
     def supported_formats(self) -> list[TextFormat]:
@@ -47,13 +55,20 @@ class PlainHandler(FormatHandler):
 
 
 class MarkdownHandler(FormatHandler):
-    """Обработчик для Markdown формата. Пока не реализован."""
+    """Обработчик для Markdown формата. Использует MarkdownTranslator."""
 
     def handle(
         self, text: str, src_lang: str, tgt_lang: str, engine: TranslationEngineProtocol
     ) -> str:
+        from .markdown2.markdown_translator import MarkdownTranslator
 
-        raise NotImplementedError("Markdown is not implemented yet")
+        translator = MarkdownTranslator(
+            text=text,
+            src_lang=src_lang,
+            tgt_lang=tgt_lang,
+            engine=engine,
+        )
+        return translator.process()
 
     @property
     def supported_formats(self) -> list[TextFormat]:

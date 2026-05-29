@@ -56,7 +56,15 @@ class TranslationService:
                 logger.warning(
                     "Falling back to plain text translation due to Markdown processing error."
                 )
-                return self.engine.translate(text, src_lang, tgt_lang)
+                from .plain_text_translator import PlainTextTranslator
+
+                translator = PlainTextTranslator(
+                    text=text,
+                    src_lang=src_lang,
+                    target_lang=tgt_lang,
+                    engine=self.engine,
+                )
+                return translator.process()
             raise
 
     @staticmethod

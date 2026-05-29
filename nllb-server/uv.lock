@@ -553,6 +553,7 @@ dev = [
     { name = "pytest" },
     { name = "rich" },
     { name = "ruff" },
+    { name = "setuptools" },
 ]
 
 [package.metadata]
@@ -581,6 +582,7 @@ dev = [
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "rich", specifier = ">=15.0.0" },
     { name = "ruff", specifier = ">=0.15.14" },
+    { name = "setuptools", specifier = ">=81.0.0" },
 ]
 
 [[package]]
