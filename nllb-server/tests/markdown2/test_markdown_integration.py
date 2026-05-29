@@ -29,6 +29,14 @@ class MockTranslationEngine:
             "Term text": "Текст термина",
             "Definition text": "Текст определения",
             "Some text after.": "Некоторый текст после.",
+            "Name": "Имя",
+            "Age": "Возраст",
+            "John": "Джон",
+            "30": "30",
+            "Jane": "Джейн",
+            "25": "25",
+            "{chk_1}Done task": "{chk_1}Выполнена",
+            "{chk_2}Pending task": "{chk_2}В ожидании",
         }
 
     def _setup_tokenizer_mock(self):
@@ -45,10 +53,8 @@ class MockTranslationEngine:
         return ["eng_Latn", "rus_Cyrl"]
 
     def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
-        """Посегментный перевод чанка с сохранением маркеров разделителя '|||'."""
-        # Наш MarkdownChunker соединяет сегменты через " ||| " (с пробелами)
-        # Поэтому сплитить нужно строго с учетом пробелов по краям
-        segments = [s.strip() for s in text.split(" ||| ")]
+        """Посегментный перевод чанка с сохранением маркера разделителя '\\x1e'."""
+        segments = [s.strip() for s in text.split("\x1e")]
         translated_segments = []
 
         for seg in segments:
@@ -58,8 +64,8 @@ class MockTranslationEngine:
                 # Если сегмент не найден в словаре (или это служебный текст), возвращаем его как есть
                 translated_segments.append(seg)
 
-        # Склеиваем переведенные сегменты обратно через " ||| "
-        return " ||| ".join(translated_segments)
+        # Склеиваем переведенные сегменты обратно через "\\x1e"
+        return "\x1e".join(translated_segments)
 
     def validate_language(self, lang: str) -> None:
         pass
@@ -82,7 +88,11 @@ def mock_translator():
 
 
 def test_markdown_translator_full_pipeline(mock_translator):
-    """Сквозной интеграционный тест полного цикла перевода сложного Markdown документа."""
+    """Сквозной интеграционный тест полного цикла перевода сложного Markdown документа.
+
+    Проверяет, что при переводе файла с определённой структурой (заголовки, списки,
+    таблицы, task lists, код, цитаты), она сохранилась. Сам перевод mock-овый.
+    """
 
     # 1. Формируем "грязный" исходный Markdown-текст на английском со всеми edge-cases
     source_markdown = (
@@ -100,13 +110,16 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "def hello():\n"
         "    print('world')\n"
         "```\n\n"
+        "| Name | Age |\n"
+        "|------|-----|\n"
+        "| John | 30  |\n"
+        "| Jane | 25  |\n\n"
+        "- [x] Done task\n"
+        "- [ ] Pending task\n\n"
         "Some text after."
     )
 
-    # 2. Прогоняем через главный метод оркестратора
-    result_markdown = mock_translator.process(source_markdown)
-
-    # 3. Формируем эталонный ожидаемый Markdown на русском языке
+    # 2. Ожидаемый результат после перевода (структура должна сохраниться)
     expected_markdown = (
         "---\n"
         "title: Document\n"
@@ -121,12 +134,45 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "> ```python\n"
         "def hello():\n"
         "    print('world')\n"
-        "```\n\n"
-        "Некоторый текст после.\n"
+        "```\\n\\n"
+        "| Имя | Возраст |\n"
+        "|------|-----|\n"
+        "| Джон | 30  |\n"
+        "| Джейн | 25  |\n\n"
+        "- [x] Выполнена\n"
+        "- [ ] В ожидании\n\n"
+        "Некоторый текст после."
     )
 
-    # 4. Проверяем полное посимвольное соответствие структуры документов
-    assert result_markdown.strip() == expected_markdown.strip()
+    # 3. Прогоняем через главный метод оркестратора
+    result_markdown = mock_translator.process(source_markdown)
+
+    # 4. Проверяем, что результат не пустой
+    assert result_markdown is not None
+    assert len(result_markdown) > 0
+
+    # Проверяем наличие ключевых структурных элементов
+    # Front matter должен сохраниться
+    assert "---" in result_markdown
+    assert "title: Document" in result_markdown
+
+    # Таблица должна сохраниться
+    assert "|" in result_markdown
+
+    # Task list должен сохраниться
+    assert "- [x]" in result_markdown or "- [ ]" in result_markdown
+
+    # Код должен сохраниться
+    assert "```" in result_markdown
+
+    # Списки должны сохраниться
+    assert "-" in result_markdown
+
+    # Текст должен быть переведён (проверка наличия русского текста)
+    assert "John" in result_markdown or "Джон" in result_markdown
+
+    # Полное соответствие переведённого ожидаемому
+    assert result_markdown == expected_markdown
 
 
 @pytest.mark.parametrize("empty_input", ["", "   ", "\n\n"])

@@ -197,7 +197,7 @@ def test_merge_translations_ideal_scenario(chunker):
 
 
 def test_merge_translations_fallback_by_masks(chunker):
-    """Тест аварийного мержа: модель стерла маркер |||, но у нас есть маски-якоря."""
+    """Тест аварийного мержа: модель стерла маркер \\x1e, но у нас есть маски-якоря."""
     u1 = TranslationUnit(
         node_id="node_1",
         node_type="paragraph",
