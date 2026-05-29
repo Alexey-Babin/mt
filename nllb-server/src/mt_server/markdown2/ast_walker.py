@@ -1,11 +1,16 @@
+import logging
 from typing import List, Optional, Tuple
 
 from markdown_it.tree import SyntaxTreeNode
+
+from mt_server.config import settings
 
 from .node_type import get_unit_type
 from .placeholder import PlaceholderManager
 from .translation_unit import TranslationUnit
 from .translation_unit_type import TranslationUnitType
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class ASTWalker:
@@ -24,14 +29,33 @@ class ASTWalker:
         self._node_counter += 1
         return f"node_{self._node_counter}"
 
+    def _blocks_qty(self, unit_type: TranslationUnitType):
+        return sum(1 for u in self.units if u.unit_type == unit_type)
+
     def walk(self, root: SyntaxTreeNode) -> List[TranslationUnit]:
         """Точка входа. Обходит дерево и возвращает плоский список юнитов."""
         self.units = []
         self._node_counter = 0
         self._context_stack = []
 
+        logger.debug("Starting AST walk: root type=%s", root.type)
+
         # Запускаем рекурсивный DFS-обход с корня дерева
         self._traverse(root, parent_id=None, index=0)
+
+        if settings.debug_mode:
+            context_blocks = self._blocks_qty(TranslationUnitType.CONTEXT_BLOCK)
+            inline_translate = self._blocks_qty(TranslationUnitType.INLINE_TRANSLATE)
+            inline_protect = self._blocks_qty(TranslationUnitType.INLINE_PROTECT)
+            structural = self._blocks_qty(TranslationUnitType.STRUCTURAL_IGNORE)
+
+            logger.debug(
+                "AST walk complete: context_blocks=%d, inline_translate=%d, inline_protect=%d, structural=%d",
+                context_blocks,
+                inline_translate,
+                inline_protect,
+                structural,
+            )
         return self.units
 
     def _traverse(
@@ -76,6 +100,12 @@ class ASTWalker:
         """Сценарий А (Начало): Инициализирует контейнер и пушит его в стек контекстов."""
         node_id = self._generate_node_id()
         clean_type = node.type.replace("_open", "")
+        logger.debug(
+            "Context block open: type=%s, node_id=%s, level=%d",
+            clean_type,
+            node_id,
+            node.level,
+        )
 
         context_unit = TranslationUnit(
             node_id=node_id,
@@ -111,6 +141,13 @@ class ASTWalker:
         if unit_type == TranslationUnitType.CONTEXT_BLOCK and node.type.endswith(
             "_close"
         ):
+            logger.debug(
+                "Context block close: type=%s, node_id=%s, text_length=%d",
+                current_unit.node_type,
+                current_unit.node_id,
+                len(current_unit.extracted_text),
+            )
+
             # Фиксируем все собранные плейсхолдеры из реестра менеджера (сам unit уже лежит в self.units)
             current_unit.placeholders = list(current_manager.registry.values())
 
@@ -147,6 +184,13 @@ class ASTWalker:
         ):
             ph = current_manager.create_placeholder(node)
 
+            logger.debug(
+                "Inline element: type=%s, mask=%s, strategy=%s",
+                node.type,
+                ph.tag_mask.strip(),
+                ph.strategy,
+            )
+
             # Очищаем маску от внешних служебных пробелов (.strip()), делая её вида {s_1}
             clean_mask = ph.tag_mask.strip()
             current_unit.extracted_text += clean_mask
@@ -177,6 +221,13 @@ class ASTWalker:
         # У токенов fence в markdown-it-py язык кода (например, info = "python") лежит в поле node.info
         # Вытаскиваем его, чтобы reconstructor знал язык подсветки синтаксиса
         lang_info = getattr(node, "info", "") or None
+
+        logger.debug(
+            "Structural block: type=%s, node_id=%s, level=%d",
+            node.type,
+            node_id,
+            node.level,
+        )
 
         unit = TranslationUnit(
             node_id=node_id,
@@ -212,6 +263,9 @@ class ASTWalker:
     ):
         """Сценарий Д: Обрабатывает Front Matter метаданные."""
         node_id = self._generate_node_id()
+
+        logger.debug("Special case: type=%s, node_id=%s", node.type, node_id)
+
         special_unit = TranslationUnit(
             node_id=node_id,
             node_type=node.type,

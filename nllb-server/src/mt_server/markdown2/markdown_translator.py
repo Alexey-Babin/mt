@@ -1,6 +1,7 @@
 # markdown_translator.py
 """Главный файл модуля, точка входа"""
 
+import logging
 from typing import List
 
 from markdown_it.tree import SyntaxTreeNode
@@ -13,6 +14,8 @@ from .chunker import MarkdownChunker
 from .parser import create_markdown_parser  # Изменено под имя вашего файла
 from .reconstructor import MarkdownReconstructor
 from .translation_unit import TranslationUnit
+
+logger = logging.getLogger("uvicorn.error")
 
 max_input_tokens = settings.max_input_tokens
 
@@ -54,20 +57,48 @@ class MarkdownTranslator:
 
         self.source_text = markdown_text
 
+        logger.info("Starting Markdown translation pipeline")
+        logger.debug("Input text length: %d characters", len(markdown_text))
+
         # Шаг 1: Формируем синтаксическое дерево (AST)
         tokens = self.parser.parse(self.source_text)
         ast_root = SyntaxTreeNode(tokens)
 
+        logger.debug(
+            "AST parsed: root type=%s, children count=%d",
+            ast_root.type,
+            len(ast_root.children) if ast_root.children else 0,
+        )
+
         # Шаг 2: Разбираем текст на TranslationUnit (сохраняя структуру стеком)
         self.units = self.walker.walk(ast_root)
 
+        translatable_count = sum(1 for u in self.units if u.need_translation)
+        logger.info(
+            "AST walked: total units=%d, translatable units=%d",
+            len(self.units),
+            translatable_count,
+        )
+
         # Шаг 3: Нарезаем переводимые юниты на безопасные чанки для NLLB
         chunks = self.chunker.create_chunks(self.units)
+        total_tokens = sum(c.token_count for c in chunks)
+        logger.info(
+            "Chunks created: count=%d, total tokens=%d", len(chunks), total_tokens
+        )
 
         # Шаг 4: Отправляем PlainText каждого чанка в Translation Engine
         translated_chunks_text = []
-        for chunk in chunks:
+        for i, chunk in enumerate(chunks):
             plain_text_to_translate = chunk.to_plain_text()
+
+            logger.debug(
+                "Translating chunk %d/%d: %d tokens, %d segments",
+                i + 1,
+                len(chunks),
+                chunk.token_count,
+                len(chunk.segments),
+            )
 
             # Вызов вашего оригинального движка перевода по протоколу TranslationEngineProtocol
             translated_plain = self.engine.translate(
@@ -77,8 +108,27 @@ class MarkdownTranslator:
             )
             translated_chunks_text.append(translated_plain)
 
+            logger.debug(
+                "Chunk %d translated: response length=%d characters",
+                i + 1,
+                len(translated_plain),
+            )
+
         # Шаг 5: Текст на основании плейсхолдеров раскладывается обратно в юниты
         self.chunker.merge_translations(chunks, translated_chunks_text, self.units)
+
+        translated_units = sum(1 for u in self.units if u.is_translated)
+        errors_count = sum(1 for u in self.units if u.has_errors)
+        logger.info(
+            "Translations merged: translated units=%d, errors=%d",
+            translated_units,
+            errors_count,
+        )
+        logger.info(
+            "Reconstruction complete: output length=%d characters",
+            len(self.translated_text),
+        )
+        logger.info("Markdown translation pipeline completed successfully")
 
         # Шаг 6: Из плоского списка сбалансированных юнитов формируется итоговый Markdown
         self.translated_text = self.reconstructor.reconstruct(self.units)

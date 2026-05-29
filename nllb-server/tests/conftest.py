@@ -1,12 +1,43 @@
 # tests/conftest.py
 """Common fixtures and configuration for tests."""
 
+import logging
 from unittest.mock import MagicMock
 
 import pytest
 
 from mt_server.engine import TranslationEngineProtocol
 from mt_server.translation_service import TranslationService
+
+
+def pytest_configure(config):
+    """Configure logging based on verbosity level."""
+    verbosity = config.getoption("verbose", 0)
+    if verbosity >= 1:
+        # Set up logging for uvicorn.error to show DEBUG level logs
+        logger = logging.getLogger("uvicorn.error")
+        logger.setLevel(logging.DEBUG)
+
+        # Remove existing handlers to avoid duplicates
+        logger.handlers.clear()
+
+        # Create console handler
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.DEBUG)
+
+        # Create formatter with test-friendly format
+        formatter = logging.Formatter(
+            "%(levelname)s - %(name)s - %(message)s", datefmt="%H:%M:%S"
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+        # Prevent logs from propagating to root logger (avoid duplicates)
+        logger.propagate = False
+
+        # Also configure the root logger to capture uvicorn.error
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
 
 
 @pytest.fixture

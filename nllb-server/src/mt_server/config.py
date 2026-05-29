@@ -1,6 +1,8 @@
 import os
 from dataclasses import dataclass
 
+TRUE_VALUES = ["true", "1", "t", "yes", "y"]
+
 
 @dataclass(slots=True)
 class MTConfig:
@@ -49,6 +51,8 @@ class MTConfig:
             "2",
         )
     )
+
+    debug_mode: bool = os.environ.get("DEBUG", "0").lower() in TRUE_VALUES
 
 
 settings = MTConfig()

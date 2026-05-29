@@ -1,9 +1,14 @@
+import logging
 from typing import Any, Dict, List, Tuple
 
 import regex as re
 
+from mt_server.config import settings
+
 from .translation_unit import TranslationUnit
 from .translation_unit_type import TranslationUnitType
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class MarkdownReconstructor:
@@ -29,6 +34,17 @@ class MarkdownReconstructor:
         self._buffer = []
         self._block_stack = []
 
+        logger.debug("Recinstruction start: total_units=%d", len(units))
+
+        if settings.debug_mode:
+            unit_type_counts: Dict[str, int] = {}
+            for unit in units:
+                unit_type_counts[unit.unit_type.value] = (
+                    unit_type_counts.get(unit.unit_type.value, 0) + 1
+                )
+
+            logger.debug("Unit type distribution: %s", unit_type_counts)
+
         for unit in units:
             if unit.unit_type == TranslationUnitType.STRUCTURAL_IGNORE:
                 self._handle_structural_marker(unit)
@@ -39,7 +55,9 @@ class MarkdownReconstructor:
             elif unit.unit_type == TranslationUnitType.SPECIAL_CASE:
                 self._handle_special_case(unit)
 
-        return "".join(self._buffer)
+        result = "".join(self._buffer)
+        logger.info("Reconstruction complete: output_length=%d characters", len(result))
+        return result
 
     def _get_current_prefix(self, for_block_start: bool = False) -> Tuple[str, str]:
         """Вычисляет префикс для текущей строки на основе стека вложенности.
@@ -108,10 +126,18 @@ class MarkdownReconstructor:
         is_close = unit.node_type.endswith("_close")
         base_type = unit.node_type.replace("_open", "").replace("_close", "")
 
+        logger.debug(
+            "Structural marker: type=%s, is_open=%s, is_close=%s",
+            unit.node_type,
+            is_open,
+            is_close,
+        )
+
         # Хронологический перехват блоков кода (fence, code_block) и разделителей (hr)
         # Обрабатываем их строго ОДИН раз (при открытии или если это одиночный токен hr)
         if base_type in ("fence", "code_block"):
             if is_open or (not is_open and not is_close):
+                logger.debug("  Writing code block: info_str=%s", unit.info or "")
                 # 1. Перед блоком кода выставляем текущий префикс вложенности (> ),
                 # чтобы сам маркер открытия ``` встал на правильный уровень структуры цитаты
                 prefix, _ = self._get_current_prefix(for_block_start=False)
@@ -126,6 +152,7 @@ class MarkdownReconstructor:
             return  # Игнорируем fence_close, предотвращая засорение стека блоков
 
         if unit.node_type == "hr":
+            logger.debug("  Writing horizontal rule")
             self._write_with_prefix("---\n\n")
             return
 
@@ -135,11 +162,13 @@ class MarkdownReconstructor:
             if base_type == "ordered_list":
                 start_num = unit.attrs.get("start", 1) if unit.attrs else 1
                 marker = f"{start_num}."
+                logger.debug("  Opening ordered list: start=%d", start_num)
             elif base_type == "bullet_list":
                 if unit.info and unit.info in ("-", "*", "+"):
                     marker = unit.info
                 elif unit.tag and unit.tag in ("-", "*", "+"):
                     marker = unit.tag
+                logger.debug("  Opening bullet list: marker=%s", marker)
             elif base_type == "list_item":
                 # Элемент списка наследует маркер от своего родительского контейнера в стеке
                 parent_list = next(
@@ -151,6 +180,7 @@ class MarkdownReconstructor:
                     None,
                 )
                 if parent_list:
+                    logger.debug("  Opening list item: marker=%s", marker)
                     marker = parent_list["marker"]
 
             # Пушим в стек расширенные метаданные
@@ -161,12 +191,21 @@ class MarkdownReconstructor:
                     "is_first_paragraph": True if base_type == "list_item" else False,
                 }
             )
+            logger.debug(
+                "  Pushed to block stack: type=%s, stack_size=%d",
+                base_type,
+                len(self._block_stack),
+            )
 
         elif is_close:
             # Безопасно снимаем блок со стека
             if self._block_stack and self._block_stack[-1]["type"] == base_type:
                 self._block_stack.pop()
-
+                logger.debug(
+                    "  Popped from block stack: type=%s, stack_size=%d",
+                    base_type,
+                    len(self._block_stack),
+                )
             if base_type in (
                 "blockquote",
                 "bullet_list",
@@ -184,6 +223,7 @@ class MarkdownReconstructor:
         оборачивая его контент в стандартные ограничители '---'.
         """
         if unit.node_type == "front_matter":
+            logger.debug("Handling front matter special case")
             # Извлекаем текст метаданных.
             # Если в будущем у юнита заполнится translated_text (после кастомного yaml-парсера),
             # мы возьмем его, иначе возвращаем исходную original_text.
@@ -200,6 +240,10 @@ class MarkdownReconstructor:
             # поэтому пишем их напрямую в буфер, минуя префиксы вложенности.
             front_matter_block = f"---\n{fm_content}---\n\n"
             self._buffer.append(front_matter_block)
+            logger.debug(
+                "Front matter block written: length=%d characters",
+                len(front_matter_block),
+            )
 
     def _handle_context_block(self, unit: TranslationUnit):
         """Обрабатывает текстовые контейнеры (включая dt и dd)."""
@@ -207,9 +251,15 @@ class MarkdownReconstructor:
         base_type = unit.node_type.replace("_open", "").replace("_close", "")
 
         if is_close:
+            logger.debug("Context block close: type=%s", base_type)
             # Снимаем контекстный блок dt/dd со стека
             if self._block_stack and self._block_stack[-1]["type"] == base_type:
                 self._block_stack.pop()
+                logger.debug(
+                    "Popped context block from stack: type=%s, stack_size=%d",
+                    base_type,
+                    len(self._block_stack),
+                )
 
             if base_type in (
                 "paragraph",
@@ -229,17 +279,32 @@ class MarkdownReconstructor:
         # Пушим их в стек, чтобы метод префиксации знал, как их форматировать.
         if base_type in ("dt", "dd"):
             self._block_stack.append({"type": base_type, "is_first_line": True})
+            logger.debug(
+                "Pushed context block to stack: type=%s, stack_size=%d",
+                base_type,
+                len(self._block_stack),
+            )
 
         text_to_restore = (
             unit.translated_text
             if unit.translated_text is not None
             else unit.extracted_text
         )
+
+        logger.debug(
+            "Restoring inline placeholders for %s: text_length=%d, placeholders_count=%d",
+            base_type,
+            len(text_to_restore),
+            len(unit.placeholders) if unit.placeholders else 0,
+        )
         restored_markdown = self._restore_inline_placeholders(text_to_restore, unit)
 
         if unit.node_type == "heading":
             level = unit.level if unit.level else 1
             block_content = "#" * level + " " + restored_markdown
+            logger.debug(
+                "Heading level %d: content_length=%d", level, len(block_content)
+            )
         else:
             block_content = restored_markdown
 
@@ -251,7 +316,13 @@ class MarkdownReconstructor:
         Использует парные регулярные выражения для предотвращения ломания синтаксиса.
         """
         if not unit.placeholders:
+            logger.debug("No placeholders to restore for unit")
             return text
+
+        logger.debug(
+            "Starting placeholder restoration: total_placeholders=%d",
+            len(unit.placeholders),
+        )
 
         # Нормализуем текст ответа: убираем возможные фантомные пробелы вокруг масок,
         # которые могла добавить модель NLLB, приводя их к стандартному виду "{lnk_1}"
@@ -283,6 +354,12 @@ class MarkdownReconstructor:
                 else:
                     atomic_ph_map[clean_mask] = ph
 
+        logger.debug(
+            "Placeholder maps built: open_tags=%d, atomic_tags=%d",
+            len(open_ph_map),
+            len(atomic_ph_map),
+        )
+
         # --- ШАГ 1: ВОССТАНОВЛЕНИЕ ПАРНЫХ ТЕГОВ (Ссылки и Стили) ---
         # Регулярка находит: {префикс_ID} текст {/префикс_ID}
         # Учитывает любые пробелы внутри фигурных скобок
@@ -297,12 +374,20 @@ class MarkdownReconstructor:
 
             ph = open_ph_map.get((prefix, ph_id))
             if not ph:
+                logger.warning(
+                    "Paired placeholder not found in map: prefix=%s, id=%d",
+                    prefix,
+                    ph_id,
+                )
+
                 return match.group(0)  # Фолбек: возвращаем как есть, если тег сломан
 
             if prefix == "lnk":
                 href = ph.original_markup.get("href", "")
                 title = f' "{t}"' if (t := ph.original_markup.get("title")) else ""
-                return f"[{inner_content}]({href}{title})"
+                result = f"[{inner_content}]({href}{title})"
+                logger.debug("Restored link: href=%s", href)
+                return result
 
             elif prefix == "s":
                 return f"**{inner_content}**"
@@ -315,9 +400,14 @@ class MarkdownReconstructor:
 
         # Запускаем рекурсивную замену для поддержки вложенных инлайнов (например, жирный внутри ссылки)
         old_text = ""
+        iteration = 0
         while old_text != normalized_text:
             old_text = normalized_text
             normalized_text = paired_regex.sub(replace_paired, normalized_text)
+            iteration += 1
+
+        if iteration > 1:
+            logger.debug("Paired tag replacement iterations: %d", iteration)
 
         # --- ШАГ 2: ВОССТАНОВЛЕНИЕ ОДИНОЧНЫХ ТЕГОВ (Код, Картинки, Брейки) ---
         atomic_regex = re.compile(r"\{\s*([a-zA-Z0-9_/]+)\s*\}")
@@ -326,32 +416,49 @@ class MarkdownReconstructor:
             full_mask = f"{{{match.group(1)}}}"
             ph = atomic_ph_map.get(full_mask)
             if not ph:
+                logger.warning(
+                    "Atomic placeholder not found in map: mask=%s", full_mask
+                )
                 return full_mask
 
             if ph.node_type == "code_inline":
-                return (
+                result = (
                     f"`{ph.original_markup}`"
                     if not str(ph.original_markup).startswith("`")
                     else str(ph.original_markup)
                 )
+                logger.debug(" Restored inline code")
+                return result
             elif ph.node_type == "math_inline":
-                return (
+                result = (
                     f"${ph.original_markup}$"
                     if not str(ph.original_markup).startswith("$")
                     else str(ph.original_markup)
                 )
+                logger.debug(" Restored inline math")
+                return result
             elif ph.node_type in ("softbreak", "hardbreak"):
-                return "\n" if ph.node_type == "softbreak" else "<br>"
+                result = "\n" if ph.node_type == "softbreak" else "<br>"
+                logger.debug(" Restored break: type=%s", ph.node_type)
+                return result
             elif ph.node_type == "image":
                 src = ph.original_markup.get("src", "")
                 title = f' "{t}"' if (t := ph.original_markup.get("title")) else ""
                 # Если в original_markup нет alt (например в моках), берем оригинальный из юнита
                 alt = ph.original_markup.get("alt", "") or unit.original_text or "image"
-                return f"![{alt}]({src}{title})"
+                result = f"![{alt}]({src}{title})"
+                logger.debug(" Restored image: src=%s", src)
+                return result
 
             return str(ph.original_markup)
 
         final_text = atomic_regex.sub(replace_atomic, normalized_text)
 
         # Чистим артефакты двойных пробелов, возникшие при нормализации масок
-        return re.sub(r" +", " ", final_text).strip()
+        clear_text = re.sub(r" +", " ", final_text).strip()
+        logger.debug(
+            "Placeholder restoration complete: original_length=%d, final_length=%d",
+            len(text),
+            len(clear_text),
+        )
+        return clear_text

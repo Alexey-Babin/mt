@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, field
 from typing import List
 
@@ -6,6 +7,8 @@ import regex as re
 from mt_server.utils import count_tokens, split_sentences
 
 from .translation_unit import TranslationUnit
+
+logger = logging.getLogger("uvicorn.error")
 
 
 @dataclass(slots=True)
@@ -58,6 +61,10 @@ class MarkdownChunker:
 
         translatable_units = [u for u in units if u.need_translation]
 
+        logger.debug(
+            "Creating chunks from %d translatable units", len(translatable_units)
+        )
+
         for unit in translatable_units:
             sentences = split_sentences(unit.extracted_text, self.lang_code)
 
@@ -79,6 +86,11 @@ class MarkdownChunker:
                     if current_chunk.segments and (
                         current_chunk.token_count + part_tokens > self.max_tokens
                     ):
+                        logger.debug(
+                            "  Chunk %d full (%d tokens), creating new chunk",
+                            chunk_counter,
+                            current_chunk.token_count,
+                        )
                         self.chunks.append(current_chunk)
                         chunk_counter += 1
                         current_chunk = MarkdownChunk(chunk_id=chunk_counter)
@@ -92,6 +104,8 @@ class MarkdownChunker:
 
         if current_chunk.segments:
             self.chunks.append(current_chunk)
+
+        logger.info("Chunks created: total=%d chunks", len(self.chunks))
 
         return self.chunks
 
@@ -146,8 +160,11 @@ class MarkdownChunker:
                 if not u.extracted_text.strip():
                     u.is_translated = True
 
-        for chunk, response_text in zip(chunks, translated_texts):
+        logger.debug("Merging translations for %d chunks", len(chunks))
+
+        for i, (chunk, response_text) in enumerate(zip(chunks, translated_texts)):
             if not response_text.strip():
+                logger.warning("  Chunk %d: empty translation response", i + 1)
                 continue
 
             # Нарезаем строго по непечатному ASCII управляющему разделителю \x1E
@@ -162,9 +179,23 @@ class MarkdownChunker:
                     else:
                         unit.translated_text = translated_text
                     unit.is_translated = True
+
+                logger.debug(
+                    "Chunk %d: successfully merged %d segments",
+                    i + 1,
+                    len(translated_segments),
+                )
             else:
+                logger.warning(
+                    "Chunk %d: segment mismatch (expected=%d, got=%d), using fallback",
+                    i + 1,
+                    len(chunk.segments),
+                    len(translated_segments),
+                )
                 # В случае редкой аномалии (если модель вырезала байт-токен), спасаем данные гибридным алгоритмом
                 self._fallback_align_segments(chunk, translated_segments, unit_map)
+        merged_count = sum(1 for u in units if u.is_translated and u.need_translation)
+        logger.info("Merge complete: %d units translated", merged_count)
 
     def _fallback_align_segments(
         self, chunk: MarkdownChunk, translated_segments: List[str], unit_map: dict
