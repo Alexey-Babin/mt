@@ -61,6 +61,8 @@ _NODE_TYPE_MAP: Dict[str, TranslationUnitType] = {}
 for block in _BLOCK_TYPES:
     _NODE_TYPE_MAP[f"{block}_open"] = TranslationUnitType.CONTEXT_BLOCK
     _NODE_TYPE_MAP[f"{block}_close"] = TranslationUnitType.CONTEXT_BLOCK
+    # Добавляем также базовые типы без суффиксов для совместимости с SyntaxTreeNode
+    _NODE_TYPE_MAP[block] = TranslationUnitType.CONTEXT_BLOCK
 
 # Заполняем транслируемый инлайн open/close
 for inline in _INLINE_TRANSLATE_PAIRED:
@@ -103,7 +105,7 @@ for block in _SINGLE_STRUCTURAL_BLOCKS:
 
 # Служебные одиночные токены и исключения
 _NODE_TYPE_MAP["text"] = TranslationUnitType.INLINE_TRANSLATE
-_NODE_TYPE_MAP["inline"] = TranslationUnitType.STRUCTURAL_IGNORE
+
 _NODE_TYPE_MAP["document"] = TranslationUnitType.STRUCTURAL_IGNORE
 _NODE_TYPE_MAP["hr"] = TranslationUnitType.STRUCTURAL_IGNORE
 _NODE_TYPE_MAP["front_matter"] = TranslationUnitType.SPECIAL_CASE

@@ -157,6 +157,22 @@ class MarkdownReconstructor:
             return
 
         # --- СТАНДАРТНАЯ СТРУКТУРНАЯ ЛОГИКА ДЛЯ ПАРНЫХ КОНТЕЙНЕРОВ (цитаты, списки) ---
+        # Особая обработка для blockquote без суффиксов (когда он содержит только fence)
+        if base_type == "blockquote" and not is_open and not is_close:
+            # Это одиночный узел blockquote (без _open/_close), пушим его в стек
+            self._block_stack.append(
+                {
+                    "type": base_type,
+                    "marker": "",
+                    "is_first_paragraph": False,
+                }
+            )
+            logger.debug(
+                "  Pushed blockquote (no suffix) to block stack: stack_size=%d",
+                len(self._block_stack),
+            )
+            return
+
         if is_open:
             marker = "-"
             if base_type == "ordered_list":

@@ -66,7 +66,7 @@ class ASTWalker:
         # Сначала проверяем тип строки на "root" или "document" БЕЗ вызова get_unit_type,
         # так как у корневого узла 'root' нельзя безопасно читать свойства токенов.
         if node.type in ("root", "document"):
-            for idx, child in enumerate(node.children):
+            for idx, child in enumerate(node.children or []):
                 self._traverse(child, parent_id=parent_id, index=idx)
             return
 
@@ -84,11 +84,28 @@ class ASTWalker:
                 return
 
         # --- РЕЖИМ ОБХОДА СТРУКТУРЫ И НАЧАЛА КОНТЕКСТОВ ---
-        if unit_type == TranslationUnitType.CONTEXT_BLOCK:
-            if node.type.endswith("_open"):
-                self._handle_context_block_open(node, parent_id, index)
+        # Проверяем, является ли узел CONTEXT_BLOCK без суффиксов (например, "paragraph")
+        if (
+            unit_type == TranslationUnitType.CONTEXT_BLOCK
+            and not node.type.endswith("_open")
+            and not node.type.endswith("_close")
+        ):
+            # Это базовый тип блока (например, "paragraph" от SyntaxTreeNode),
+            # обрабатываем его как открывающий тег
+            self._handle_context_block_open(node, parent_id, index)
+        elif unit_type == TranslationUnitType.CONTEXT_BLOCK and node.type.endswith(
+            "_open"
+        ):
+            self._handle_context_block_open(node, parent_id, index)
 
         elif unit_type == TranslationUnitType.STRUCTURAL_IGNORE:
+            # Особая обработка для inline-контейнера: спускаемся внутрь,
+            # чтобы обработать дочерние инлайн-элементы (code_inline, strong, em...)
+            if node.type == "inline":
+                for idx, child in enumerate(node.children or []):
+                    self._traverse(child, parent_id=parent_id, index=idx)
+                return
+
             self._handle_structural_block(node, parent_id, index)
 
         elif unit_type == TranslationUnitType.SPECIAL_CASE:
@@ -129,6 +146,17 @@ class ASTWalker:
         # Рекурсивно спускаемся к детям
         for idx, child in enumerate(node.children):
             self._traverse(child, parent_id=node_id, index=idx)
+
+        # Фиксируем плейсхолдеры после обработки всех дочерних элементов
+        # Это необходимо для базовых типов блоков (например, "paragraph"),
+        # у которых нет явных _open/_close тегов в AST
+        context_unit.placeholders = list(manager.registry.values())
+        logger.debug(
+            "Context block complete: type=%s, node_id=%s, placeholders_count=%d",
+            clean_type,
+            node_id,
+            len(context_unit.placeholders),
+        )
 
     def _collect_inline(
         self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
