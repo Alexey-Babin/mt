@@ -40,7 +40,7 @@ def test_reconstruct_plain_paragraph(reconstructor):
     result = reconstructor.reconstruct([u1, u2])
 
     # Ожидаем текст абзаца с переводом строки на конце
-    assert result == "Привет\n"
+    assert result == "Привет\n\n"
 
 
 def test_reconstruct_heading(reconstructor):
@@ -111,7 +111,7 @@ def test_reconstruct_inline_formatting_strong(reconstructor):
     result = reconstructor.reconstruct([u1, u2])
 
     # Разметка должна вернуться на свои места вокруг переведенного слова
-    assert result == "Это **жирный** текст.\n"
+    assert result == "Это **жирный** текст.\n\n"
 
 
 def test_reconstruct_links_and_images(reconstructor):

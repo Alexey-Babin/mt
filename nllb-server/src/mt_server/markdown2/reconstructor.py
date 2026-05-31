@@ -173,6 +173,11 @@ class MarkdownReconstructor:
             )
             return
 
+        # Обработка базовых типов без суффиксов (bullet_list, list_item без _open/_close)
+        # как открывающих тегов
+        if not is_open and not is_close:
+            is_open = True
+
         if is_open:
             marker = "-"
             if base_type == "ordered_list":
@@ -287,9 +292,11 @@ class MarkdownReconstructor:
             ):
                 if self._buffer and not self._buffer[-1].endswith("\n"):
                     self._buffer.append("\n")
-            return
 
-        # ИСПРАВЛЕНО: Избыточный блок взведения флага is_first_paragraph удален!
+                # Добавляем вторую пустую строку для разделения абзацев верхнего уровня
+                if base_type == "paragraph" and not self._block_stack:
+                    self._buffer.append("\n")
+            return
 
         # Узлы dt и dd сами являются открывающими контекстными блоками.
         # Пушим их в стек, чтобы метод префиксации знал, как их форматировать.

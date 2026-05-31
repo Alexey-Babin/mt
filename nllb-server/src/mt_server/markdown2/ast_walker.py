@@ -98,6 +98,37 @@ class ASTWalker:
         ):
             self._handle_context_block_open(node, parent_id, index)
 
+        elif unit_type == TranslationUnitType.CONTEXT_BLOCK and node.type.endswith(
+            "_close"
+        ):
+            # Для парных тегов: создаём закрывающий маркер и удаляем контекст из стека
+            close_node_id = self._generate_node_id()
+            clean_type = node.type.replace("_close", "")
+
+            logger.debug(
+                "Context block close: type=%s, node_id=%s",
+                clean_type,
+                close_node_id,
+            )
+
+            close_unit = TranslationUnit(
+                node_id=close_node_id,
+                node_type=node.type,
+                unit_type=TranslationUnitType.CONTEXT_BLOCK,
+                original_text="",
+                extracted_text="",
+                need_translation=False,
+                parent_id=parent_id,
+                index_in_parent=index,
+                level=node.level,
+                tag=node.tag,
+            )
+            self.units.append(close_unit)
+
+            # Удаляем контекст из стека
+            if self._context_stack:
+                self._context_stack.pop()
+
         elif unit_type == TranslationUnitType.STRUCTURAL_IGNORE:
             # Особая обработка для inline-контейнера: спускаемся внутрь,
             # чтобы обработать дочерние инлайн-элементы (code_inline, strong, em...)
@@ -113,8 +144,12 @@ class ASTWalker:
 
     def _handle_context_block_open(
         self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
-    ):
-        """Сценарий А (Начало): Инициализирует контейнер и пушит его в стек контекстов."""
+    ) -> bool:
+        """Сценарий А (Начало): Инициализирует контейнер и пушит его в стек контекстов.
+
+        Returns:
+            True если это был базовый тип блока (без суффиксов), False если парный тег (_open)
+        """
         node_id = self._generate_node_id()
         clean_type = node.type.replace("_open", "")
         logger.debug(
@@ -148,8 +183,6 @@ class ASTWalker:
             self._traverse(child, parent_id=node_id, index=idx)
 
         # Фиксируем плейсхолдеры после обработки всех дочерних элементов
-        # Это необходимо для базовых типов блоков (например, "paragraph"),
-        # у которых нет явных _open/_close тегов в AST
         context_unit.placeholders = list(manager.registry.values())
         logger.debug(
             "Context block complete: type=%s, node_id=%s, placeholders_count=%d",
@@ -157,6 +190,30 @@ class ASTWalker:
             node_id,
             len(context_unit.placeholders),
         )
+
+        # Для базовых типов блоков (без суффиксов) сразу создаём закрывающий маркер
+        # и удаляем контекст из стека
+        if not node.type.endswith("_open"):
+            close_node_id = self._generate_node_id()
+            close_unit = TranslationUnit(
+                node_id=close_node_id,
+                node_type=f"{clean_type}_close",
+                unit_type=TranslationUnitType.CONTEXT_BLOCK,
+                original_text="",
+                extracted_text="",
+                need_translation=False,
+                parent_id=parent_id,
+                index_in_parent=index,
+                level=node.level,
+                tag=node.tag,
+            )
+            self.units.append(close_unit)
+            self._context_stack.pop()
+            return True
+
+        # Для парных тегов (_open) оставляем контекст в стеке,
+        # закрывающий маркер будет создан при обработке явного _close узла
+        return False
 
     def _collect_inline(
         self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
@@ -242,6 +299,31 @@ class ASTWalker:
         self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
     ):
         """Сценарий Г: Обрабатывает каркас документа (blockquote, list_item), сохраняя маркеры вложенности."""
+
+        # Проверяем, является ли узел базовым типом без суффиксов (например, "list_item")
+        is_base_type = not node.type.endswith("_open") and not node.type.endswith(
+            "_close"
+        )
+
+        # Для базовых типов (list_item, blockquote без суффиксов) обрабатываем как открывающий тег
+        if is_base_type:
+            self._handle_structural_block_open(node, parent_id, index)
+            return
+
+        # Обработка явных _close тегов
+        if node.type.endswith("_close"):
+            self._handle_structural_block_close(node, parent_id, index)
+            return
+
+        # Обработка явных _open тегов
+        if node.type.endswith("_open"):
+            self._handle_structural_block_open(node, parent_id, index)
+            return
+
+    def _handle_structural_block_open(
+        self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
+    ):
+        """Создаёт открывающий маркер структурного блока и рекурсивно обрабатывает детей."""
         node_id = self._generate_node_id()
 
         node_info = getattr(node, "markup", None) or node.content or ""
@@ -251,7 +333,7 @@ class ASTWalker:
         lang_info = getattr(node, "info", "") or None
 
         logger.debug(
-            "Structural block: type=%s, node_id=%s, level=%d",
+            "Structural block open: type=%s, node_id=%s, level=%d",
             node.type,
             node_id,
             node.level,
@@ -278,13 +360,53 @@ class ASTWalker:
         # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Если это одиночный блок кода/математики/HTML,
         # мы полностью БЛОКИРУЕМ рекурсивный спуск в его детей, предотвращая дублирование в списке units
         if node.type in ("fence", "code_block", "math_block", "html_block"):
+            # Для одиночных блоков сразу создаём закрывающий маркер
+            close_node_id = self._generate_node_id()
+            close_unit = TranslationUnit(
+                node_id=close_node_id,
+                node_type=node.type,
+                unit_type=TranslationUnitType.STRUCTURAL_IGNORE,
+                original_text="",
+                extracted_text="",
+                need_translation=False,
+                parent_id=parent_id,
+                index_in_parent=index,
+                level=node.level,
+                tag=node.tag,
+            )
+            self.units.append(close_unit)
             return
 
-        # Для всех остальных парных структурных блоков (цитаты, списки) спускаемся к детям,
-        # только если это открывающий тег
-        if not node.type.endswith("_close"):
-            for idx, child in enumerate(node.children):
-                self._traverse(child, parent_id=node_id, index=idx)
+        # Для всех остальных парных структурных блоков (цитаты, списки) спускаемся к детям
+        # Закрывающий маркер будет создан при обработке явного _close узла
+        for idx, child in enumerate(node.children):
+            self._traverse(child, parent_id=node_id, index=idx)
+
+    def _handle_structural_block_close(
+        self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
+    ):
+        """Создаёт закрывающий маркер структурного блока."""
+        node_id = self._generate_node_id()
+
+        logger.debug(
+            "Structural block close: type=%s, node_id=%s",
+            node.type,
+            node_id,
+        )
+
+        unit = TranslationUnit(
+            node_id=node_id,
+            node_type=node.type,
+            unit_type=TranslationUnitType.STRUCTURAL_IGNORE,
+            original_text="",
+            extracted_text="",
+            need_translation=False,
+            parent_id=parent_id,
+            index_in_parent=index,
+            level=node.level,
+            tag=node.tag,
+        )
+        self.units.append(unit)
 
     def _handle_special_case(
         self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
