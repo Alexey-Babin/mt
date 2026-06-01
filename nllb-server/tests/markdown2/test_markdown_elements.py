@@ -652,9 +652,9 @@ class TestFrontMatter:
         assert result.startswith("---"), "Front matter не начинается с ---"
         assert "title: My Document" in result, "title потерян"
         assert "author: John" in result, "author потерян"
-        assert result.endswith("Контент.") or result.endswith("Content."), (
-            "Контент после front matter потерян"
-        )
+        assert result.rstrip().endswith("Контент.") or result.rstrip().endswith(
+            "Content."
+        ), "Контент после front matter потерян"
 
     def test_front_matter_not_translated(self, mock_translator):
         """Front matter не должен переводиться."""

@@ -212,6 +212,7 @@ class MarkdownReconstructor:
             # Формируем валидный блок Front Matter
             # Метаданные всегда находятся на самом верхнем уровне документа
             front_matter_block = f"---\n{fm_content}---\n\n"
+            front_matter_block = f"---\n{fm_content}---\n"
             self._writer.write_raw(front_matter_block)
             logger.debug(
                 "Front matter block written: length=%d characters",
@@ -301,3 +302,8 @@ class MarkdownReconstructor:
                 self._writer.ensure_double_newline()
             else:
                 self._writer.ensure_newline()
+
+        # Убираем лишний перенос строки в конце файла (оставляем максимум один \n)
+        buffer = self._writer.get_buffer_content()
+        if buffer.endswith("\n\n\n"):
+            self._writer._buffer = [buffer.rstrip("\n") + "\n"]

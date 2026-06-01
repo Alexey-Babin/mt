@@ -68,6 +68,19 @@ class ContextBlockHandler:
             return False
 
         # Если есть активный контекст и это не новый открывающий блок - собираем инлайн
+        # Исключение: вложенные paragraph внутри dt/dd нужно проходить дальше, а не собирать как инлайн
+        if self._context_stack and not (
+            unit_type == TranslationUnitType.CONTEXT_BLOCK
+            and node.type.endswith("_open")
+        ):
+            # Для paragraph внутри dt/dd - продолжаем обход детей, а не собираем инлайн
+            if node.type == "paragraph" and self._context_stack[-1][0].node_type in (
+                "dt",
+                "dd",
+            ):
+                for idx, child in enumerate(node.children or []):
+                    self._walker._traverse(child, parent_id, index=idx)
+                return True
         if self._context_stack and not (
             unit_type == TranslationUnitType.CONTEXT_BLOCK
             and node.type.endswith("_open")
