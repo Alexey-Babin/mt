@@ -2,7 +2,10 @@
   "cSpell.words": ["Nllb", "Reconstructor", "комплаенса"],
   "dotenv.enableAutocloaking": false,
   "python.defaultInterpreterPath": "${workspaceFolder}/nllb-server/.venv/bin/python",
-  "python.analysis.extraPaths": ["${workspaceFolder}/nllb-server/src"],
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/nllb-server/src",
+    "./nllb-server"
+  ],
   "python.testing.pytestArgs": [
     "tests/",
     "-vv",
