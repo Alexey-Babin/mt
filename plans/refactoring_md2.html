@@ -1,0 +1,766 @@
+<div class="qwen-markdown qwen-markdown-loose">
+  <div class="qwen-markdown-paragraph">
+    <span class="qwen-markdown-text"
+      >Теперь у меня есть полное представление о структуре модуля markdown2.
+      Проведу анализ и составлю план рефакторинга.</span
+    >
+  </div>
+  <div class="qwen-markdown-space"></div>
+  <h2 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Анализ модуля markdown2</span>
+  </h2>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Текущая структура</span>
+  </h3>
+  <pre
+    class="qwen-markdown-code"
+  ><div class="qwen-markdown-code-header-wrapper"><div class="qwen-markdown-code-header" style="height: 36px;"><div></div><div class="qwen-markdown-code-header-actions"></div></div></div><div class="qwen-markdown-code-body" style="overflow: hidden; height: 513px;"><section style="display: flex; position: relative; text-align: initial; width: 100%; height: 100%;"><div style="width: 100%; --vscode-editorCodeLens-lineHeight: 16px; --vscode-editorCodeLens-fontSize: 12px; --vscode-editorCodeLens-fontFeatureSettings: &quot;liga&quot; off, &quot;calt&quot; off;" data-keybinding-context="998" data-mode-id="plaintext"><div class="monaco-editor no-user-select  showUnused showDeprecated vs" role="code" data-uri="inmemory://model/714" style="width: 500px; height: 496px;"><div data-mprt="3" class="overflow-guard" style="width: 500px; height: 496px;"><div class="native-edit-context" autocorrect="off" autocapitalize="off" autocomplete="off" spellcheck="false" tabindex="0" role="textbox" aria-required="false" aria-multiline="true" aria-autocomplete="none" aria-roledescription="editor" aria-label="Editor content" style="tab-size: 28.5469px; text-wrap: nowrap; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; top: 0px; left: 30px; height: 19px;"></div><textarea class="ime-text-area" readonly="true" tabindex="-1" aria-hidden="true"></textarea><div class="margin" role="presentation" aria-hidden="true" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; height: 496px; width: 30px;"><div class="glyph-margin" style="left: 0px; width: 0px; height: 496px;"></div><div class="margin-view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="margin-view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 30px; height: 496px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-margin-both" style="width:30px"></div><div class="line-numbers active-line-number" style="left:0px;width:14px;">1</div></div><div style="top:19px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">2</div></div><div style="top:38px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">3</div></div><div style="top:57px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">4</div></div><div style="top:76px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">5</div></div><div style="top:95px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">6</div></div><div style="top:114px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">7</div></div><div style="top:133px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">8</div></div><div style="top:152px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">9</div></div><div style="top:171px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">10</div></div><div style="top:190px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">11</div></div><div style="top:209px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">12</div></div><div style="top:228px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">13</div></div><div style="top:247px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">14</div></div><div style="top:266px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">15</div></div><div style="top:285px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">16</div></div><div style="top:304px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">17</div></div><div style="top:323px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:14px;width:16px;"></div><div class="line-numbers" style="left:0px;width:14px;">18</div></div><div style="top:342px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">19</div></div><div style="top:361px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">20</div></div><div style="top:380px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">21</div></div><div style="top:399px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">22</div></div><div style="top:418px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">23</div></div><div style="top:437px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">24</div></div><div style="top:456px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">25</div></div></div><div class="glyph-margin-widgets" style="position: absolute; top: 0px;"></div></div><div class="monaco-scrollable-element editor-scrollable vs" role="presentation" data-mprt="6" style="position: absolute; overflow: hidden; left: 30px; height: 496px; width: 470px;"><div class="lines-content monaco-editor-background" style="position: absolute; overflow: hidden; width: 1.67772e+07px; height: 1.67772e+07px; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; left: 0px;"><div class="view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; height: 0px; width: 584px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-exact" style="width:584px;"></div></div><div style="top:19px;height:19px;line-height:19px;"></div><div style="top:38px;height:19px;line-height:19px;"></div><div style="top:57px;height:19px;line-height:19px;"></div><div style="top:76px;height:19px;line-height:19px;"></div><div style="top:95px;height:19px;line-height:19px;"></div><div style="top:114px;height:19px;line-height:19px;"></div><div style="top:133px;height:19px;line-height:19px;"></div><div style="top:152px;height:19px;line-height:19px;"></div><div style="top:171px;height:19px;line-height:19px;"></div><div style="top:190px;height:19px;line-height:19px;"></div><div style="top:209px;height:19px;line-height:19px;"></div><div style="top:228px;height:19px;line-height:19px;"></div><div style="top:247px;height:19px;line-height:19px;"></div><div style="top:266px;height:19px;line-height:19px;"></div><div style="top:285px;height:19px;line-height:19px;"></div><div style="top:304px;height:19px;line-height:19px;"></div><div style="top:323px;height:19px;line-height:19px;"></div><div style="top:342px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:361px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:380px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:399px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:418px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:437px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:456px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div></div><div role="presentation" aria-hidden="true" class="view-rulers"></div><div class="view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="view-lines monaco-mouse-cursor-text" role="presentation" aria-hidden="true" data-mprt="8" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 584px; height: 496px;"><div style="top:0px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">markdown2/</span></span></div><div style="top:19px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;markdown_translator.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(135&nbsp;строк)&nbsp;-&nbsp;</span><span class="mtk1">точка&nbsp;входа</span></span></div><div style="top:38px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;parser.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(32&nbsp;строки)&nbsp;&nbsp;-&nbsp;</span><span class="mtk1">создание&nbsp;парсера</span></span></div><div style="top:57px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;ast_walker.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(116&nbsp;строк)&nbsp;&nbsp;-&nbsp;</span><span class="mtk1">обход&nbsp;AST</span></span></div><div style="top:76px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;chunker.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(249&nbsp;строк)&nbsp;&nbsp;-&nbsp;</span><span class="mtk1">нарезка&nbsp;на&nbsp;чанки</span></span></div><div style="top:95px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;translation_unit.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(41&nbsp;строка)&nbsp;&nbsp;-&nbsp;</span><span class="mtk1">модель&nbsp;данных</span></span></div><div style="top:114px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;translation_unit_type.py&nbsp;&nbsp;&nbsp;&nbsp;(16&nbsp;строк)&nbsp;&nbsp;&nbsp;-&nbsp;</span><span class="mtk1">enum&nbsp;типов</span></span></div><div style="top:133px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;node_type.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(116&nbsp;строк)&nbsp;&nbsp;-&nbsp;</span><span class="mtk1">маппинг&nbsp;типов&nbsp;узлов</span></span></div><div style="top:152px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;unit_factory.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(91&nbsp;строка)&nbsp;&nbsp;-&nbsp;</span><span class="mtk1">фабрика&nbsp;юнитов</span></span></div><div style="top:171px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;placeholder.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(171&nbsp;строка)&nbsp;-&nbsp;</span><span class="mtk1">плейсхолдеры</span></span></div><div style="top:190px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;reconstructor.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(602&nbsp;строки)&nbsp;-&nbsp;</span><span class="mtk1">СБОРКА&nbsp;(дублирует&nbsp;подмодуль!)</span></span></div><div style="top:209px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">└──&nbsp;handlers/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(544&nbsp;строки)</span></span></div><div style="top:228px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">│&nbsp;&nbsp;&nbsp;├──&nbsp;context_block_handler.py&nbsp;&nbsp;&nbsp;&nbsp;(190&nbsp;строк)</span></span></div><div style="top:247px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">│&nbsp;&nbsp;&nbsp;├──&nbsp;structural_block_handler.py&nbsp;(145&nbsp;строк)</span></span></div><div style="top:266px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">│&nbsp;&nbsp;&nbsp;├──&nbsp;special_case_handler.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(69&nbsp;строк)</span></span></div><div style="top:285px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">│&nbsp;&nbsp;&nbsp;├──&nbsp;inline_collector.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(137&nbsp;строк)</span></span></div><div style="top:304px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">│&nbsp;&nbsp;&nbsp;└──&nbsp;__init__.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(13&nbsp;строк)</span></span></div><div style="top:323px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">└──&nbsp;reconstructor/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(1006&nbsp;строк)</span></span></div><div style="top:342px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;main.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(298&nbsp;строк)</span></span></div><div style="top:361px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;state_machine.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(170&nbsp;строк)</span></span></div><div style="top:380px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;block_writer.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(99&nbsp;строк)</span></span></div><div style="top:399px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;placeholder_restorer.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(241&nbsp;строка)</span></span></div><div style="top:418px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;table_handler.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(93&nbsp;строки)</span></span></div><div style="top:437px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;code_block_handler.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(48&nbsp;строк)</span></span></div><div style="top:456px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;__init__.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(27&nbsp;строк)</span></span></div></div><div data-mprt="1" class="contentWidgets" style="position: absolute; top: 0px;"></div><div role="presentation" aria-hidden="true" class="cursors-layer cursor-line-style cursor-solid"><div class="cursor  monaco-mouse-cursor-text " style="height: 19px; top: 0px; left: 0px; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; display: block; visibility: hidden; padding-left: 0px; width: 2px;"></div></div></div><div role="presentation" aria-hidden="true" class="invisible scrollbar horizontal fade" style="position: absolute; width: 470px; height: 6px; left: 0px; bottom: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; height: 6px; transform: translate3d(0px, 0px, 0px); contain: strict; width: 378px;"></div></div><canvas class="decorationsOverviewRuler" aria-hidden="true" width="0" height="0" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; right: 0px; width: 14px; height: 496px; display: none;"></canvas><div role="presentation" aria-hidden="true" class="invisible scrollbar vertical" style="position: absolute; width: 0px; height: 496px; right: 0px; top: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; width: 14px; transform: translate3d(0px, 0px, 0px); contain: strict; height: 496px;"></div></div></div><div role="presentation" aria-hidden="true" style="width: 500px;"></div><div data-mprt="4" class="overlayWidgets" style="width: 500px;"><div class="sticky-widget" widgetid="editor.contrib.stickyScrollWidget" style="display: none; width: 486px; position: absolute; right: 50%; top: 0px;"><div class="sticky-widget-line-numbers" role="none" style="width: 30px;"></div><div class="sticky-widget-lines-scrollable" style="--vscode-editorStickyScroll-scrollableWidth: 570px;"><div class="sticky-widget-lines" role="list" style="left: 0px;"></div></div></div></div><div data-mprt="9" class="minimap slider-mouseover" role="presentation" aria-hidden="true" style="position: absolute; left: 0px; width: 0px; height: 496px;"><div class="minimap-shadow-hidden" style="height: 496px;"></div><canvas width="0" height="496" style="position: absolute; left: 0px; width: 0px; height: 496px;"></canvas><canvas class="minimap-decorations-layer" width="0" height="496" style="position: absolute; left: 0px; width: 0px; height: 496px;"></canvas><div class="minimap-slider" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; width: 0px;"><div class="minimap-slider-horizontal" style="position: absolute; width: 0px; height: 0px;"></div></div></div><div role="presentation" aria-hidden="true" class="blockDecorations-container"></div></div><div data-mprt="2" class="overflowingContentWidgets"></div><div data-mprt="5" class="overflowingOverlayWidgets"></div></div></div></section></div></pre>
+  <div class="qwen-markdown-space"></div>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Выявленные проблемы</span>
+  </h3>
+  <ol class="qwen-markdown-list" start="1" dir="auto">
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text">Критическое дублирование: </span
+        ><code class="qwen-markdown-codespan" style="cursor: auto"
+          >reconstructor.py</code
+        ><span class="qwen-markdown-text"> (602 строки)</span></strong
+      >
+      <ul class="qwen-markdown-list" dir="auto">
+        <li>
+          <span class="qwen-markdown-text"
+            >Файл существует параллельно с подмодулем </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >reconstructor/</code
+          >
+        </li>
+        <li>
+          <span class="qwen-markdown-text"
+            >Содержит ту же логику, что уже декомпозирована в подмодуле</span
+          >
+        </li>
+        <li>
+          <span class="qwen-markdown-text">Это главный источник путаницы</span>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text"
+          >Запутанный поток управления в AST Walker</span
+        ></strong
+      >
+      <ul class="qwen-markdown-list" dir="auto">
+        <li>
+          <code class="qwen-markdown-codespan" style="cursor: auto"
+            >_traverse()</code
+          ><span class="qwen-markdown-text">
+            делегирует handlers, но также имеет метод </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >_collect_inline()</code
+          >
+        </li>
+        <li>
+          <code class="qwen-markdown-codespan" style="cursor: auto"
+            >InlineCollector</code
+          ><span class="qwen-markdown-text"> обращается обратно к </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >walker._context_block_handler</code
+          ><span class="qwen-markdown-text"> (циклическая зависимость)</span>
+        </li>
+        <li>
+          <span class="qwen-markdown-text"
+            >Логика обработки закрывающих тегов размазана между </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >ContextBlockHandler</code
+          ><span class="qwen-markdown-text"> и </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >InlineCollector</code
+          >
+        </li>
+      </ul>
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text"
+          >Избыточная сложность handlers</span
+        ></strong
+      >
+      <ul class="qwen-markdown-list" dir="auto">
+        <li>
+          <code class="qwen-markdown-codespan" style="cursor: auto"
+            >ContextBlockHandler</code
+          ><span class="qwen-markdown-text"> использует стек кортежей </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >(TranslationUnit, PlaceholderManager)</code
+          >
+        </li>
+        <li>
+          <span class="qwen-markdown-text"
+            >При этом логика закрытия контекста дублируется в </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >_handle_close()</code
+          ><span class="qwen-markdown-text"> и </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >InlineCollector.collect()</code
+          >
+        </li>
+        <li>
+          <span class="qwen-markdown-text">Метод </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >handle_node()</code
+          ><span class="qwen-markdown-text">
+            имеет множественные пути возврата</span
+          >
+        </li>
+      </ul>
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text"
+          >Неоптимальная структура node_type.py</span
+        ></strong
+      >
+      <ul class="qwen-markdown-list" dir="auto">
+        <li>
+          <span class="qwen-markdown-text"
+            >Множественные словари для группировки типов</span
+          >
+        </li>
+        <li>
+          <span class="qwen-markdown-text">Динамическая сборка </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >_NODE_TYPE_MAP</code
+          ><span class="qwen-markdown-text"> усложняет понимание</span>
+        </li>
+        <li>
+          <span class="qwen-markdown-text"
+            >Можно упростить до прямого маппинга</span
+          >
+        </li>
+      </ul>
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text"
+          >PlaceholderManager слишком связан с AST</span
+        ></strong
+      >
+      <ul class="qwen-markdown-list" dir="auto">
+        <li>
+          <span class="qwen-markdown-text">Принимает </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >SyntaxTreeNode</code
+          ><span class="qwen-markdown-text"> напрямую</span>
+        </li>
+        <li>
+          <span class="qwen-markdown-text">Извлечение </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >original_markup</code
+          ><span class="qwen-markdown-text"> смешано с логикой ID</span>
+        </li>
+        <li>
+          <span class="qwen-markdown-text">Метод </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >_create_closing_placeholder()</code
+          ><span class="qwen-markdown-text"> — костыль для парных тегов</span>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text"
+          >Chunker содержит аварийный fallback</span
+        ></strong
+      >
+      <ul class="qwen-markdown-list" dir="auto">
+        <li>
+          <code class="qwen-markdown-codespan" style="cursor: auto"
+            >_fallback_align_segments()</code
+          ><span class="qwen-markdown-text">
+            — 50 строк dead code для аномалий NLLB</span
+          >
+        </li>
+        <li>
+          <span class="qwen-markdown-text"
+            >Усложняет тестирование основного потока</span
+          >
+        </li>
+      </ul>
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text"
+          >MarkdownTranslator смешивает оркестрацию и конфигурацию</span
+        ></strong
+      >
+      <ul class="qwen-markdown-list" dir="auto">
+        <li>
+          <span class="qwen-markdown-text">Читает </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >settings.max_input_tokens</code
+          ><span class="qwen-markdown-text"> на уровне модуля</span>
+        </li>
+        <li>
+          <span class="qwen-markdown-text">Создает компоненты в </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >__init__</code
+          ><span class="qwen-markdown-text"
+            >, хотя некоторые нужны только в </span
+          ><code class="qwen-markdown-codespan" style="cursor: auto"
+            >process()</code
+          >
+        </li>
+      </ul>
+    </li>
+  </ol>
+  <div class="qwen-markdown-space"></div>
+  <div class="qwen-markdown-hr"><hr /></div>
+  <div class="qwen-markdown-space"></div>
+  <h2 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">План рефакторинга</span>
+  </h2>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text"
+      >Фаза 1: Устранение дублирования (приоритет высокий)</span
+    >
+  </h3>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text">1.1. Удалить </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >reconstructor.py</code
+      ></strong
+    >
+  </div>
+  <ul class="qwen-markdown-list" dir="auto">
+    <li>
+      <span class="qwen-markdown-text"
+        >Файл полностью дублирует функциональность подмодуля </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >reconstructor/</code
+      >
+    </li>
+    <li>
+      <span class="qwen-markdown-text">Обновить импорты в </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >markdown_translator.py</code
+      ><span class="qwen-markdown-text">:</span>
+      <pre
+        class="qwen-markdown-code"
+      ><div class="qwen-markdown-code-header-wrapper"><div class="qwen-markdown-code-header" style="height: 36px;"><div>python</div><div class="qwen-markdown-code-header-actions"></div></div></div><div class="qwen-markdown-code-body python" style="overflow: hidden; height: 127px;"><section style="display: flex; position: relative; text-align: initial; width: 100%; height: 100%;"><div style="width: 100%; --vscode-editorCodeLens-lineHeight: 16px; --vscode-editorCodeLens-fontSize: 12px; --vscode-editorCodeLens-fontFeatureSettings: &quot;liga&quot; off, &quot;calt&quot; off;" data-keybinding-context="999" data-mode-id="python"><div class="monaco-editor no-user-select  showUnused showDeprecated vs" role="code" data-uri="inmemory://model/715" style="width: 475px; height: 110px;"><div data-mprt="3" class="overflow-guard" style="width: 475px; height: 110px;"><div class="native-edit-context" autocorrect="off" autocapitalize="off" autocomplete="off" spellcheck="false" tabindex="0" role="textbox" aria-required="false" aria-multiline="true" aria-autocomplete="none" aria-roledescription="editor" aria-label="Editor content" style="tab-size: 28.5469px; text-wrap: nowrap; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; top: 0px; left: 23px; height: 19px;"></div><textarea class="ime-text-area" readonly="true" tabindex="-1" aria-hidden="true"></textarea><div class="margin" role="presentation" aria-hidden="true" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; height: 110px; width: 23px;"><div class="glyph-margin" style="left: 0px; width: 0px; height: 110px;"></div><div class="margin-view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="margin-view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 23px; height: 110px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-margin-both" style="width:23px"></div><div class="line-numbers active-line-number" style="left:0px;width:7px;">1</div></div><div style="top:19px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">2</div></div><div style="top:38px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">3</div></div><div style="top:57px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">4</div></div><div style="top:76px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">5</div></div></div><div class="glyph-margin-widgets" style="position: absolute; top: 0px;"></div></div><div class="monaco-scrollable-element editor-scrollable vs" role="presentation" data-mprt="6" style="position: absolute; overflow: hidden; left: 23px; height: 110px; width: 452px;"><div class="lines-content monaco-editor-background" style="position: absolute; overflow: hidden; width: 1.67772e+07px; height: 1.67772e+07px; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; left: 0px;"><div class="view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; height: 0px; width: 452px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-exact" style="width:452px;"></div></div><div style="top:19px;height:19px;line-height:19px;"></div><div style="top:38px;height:19px;line-height:19px;"></div><div style="top:57px;height:19px;line-height:19px;"></div><div style="top:76px;height:19px;line-height:19px;"></div></div><div role="presentation" aria-hidden="true" class="view-rulers"></div><div class="view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="view-lines monaco-mouse-cursor-text" role="presentation" aria-hidden="true" data-mprt="8" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 452px; height: 110px;"><div style="top:0px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk10 mtki">#&nbsp;Было:</span></span></div><div style="top:19px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk24">from</span><span class="mtk1">&nbsp;.reconstructor&nbsp;</span><span class="mtk24">import</span><span class="mtk1">&nbsp;MarkdownReconstructor</span></span></div><div style="top:38px;height:19px;line-height:19px;" class="view-line"><span><span></span></span></div><div style="top:57px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk10 mtki">#&nbsp;Стало&nbsp;(уже&nbsp;правильно&nbsp;в&nbsp;подмодуле):</span></span></div><div style="top:76px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk24">from</span><span class="mtk1">&nbsp;.reconstructor.main&nbsp;</span><span class="mtk24">import</span><span class="mtk1">&nbsp;MarkdownReconstructor</span></span></div></div><div data-mprt="1" class="contentWidgets" style="position: absolute; top: 0px;"></div><div role="presentation" aria-hidden="true" class="cursors-layer cursor-line-style cursor-solid"><div class="cursor  monaco-mouse-cursor-text " style="height: 19px; top: 0px; left: 0px; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; display: block; visibility: hidden; padding-left: 0px; width: 2px;"></div></div></div><div role="presentation" aria-hidden="true" class="invisible scrollbar horizontal" style="position: absolute; width: 452px; height: 6px; left: 0px; bottom: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; height: 6px; transform: translate3d(0px, 0px, 0px); contain: strict; width: 452px;"></div></div><canvas class="decorationsOverviewRuler" aria-hidden="true" width="0" height="0" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; right: 0px; width: 14px; height: 110px; display: none;"></canvas><div role="presentation" aria-hidden="true" class="invisible scrollbar vertical" style="position: absolute; width: 0px; height: 110px; right: 0px; top: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; width: 14px; transform: translate3d(0px, 0px, 0px); contain: strict; height: 110px;"></div></div></div><div role="presentation" aria-hidden="true" style="width: 475px;"></div><div data-mprt="4" class="overlayWidgets" style="width: 475px;"><div class="sticky-widget" widgetid="editor.contrib.stickyScrollWidget" style="display: none; width: 461px; position: absolute; right: 50%; top: 0px;"><div class="sticky-widget-line-numbers" role="none" style="width: 23px;"></div><div class="sticky-widget-lines-scrollable" style="--vscode-editorStickyScroll-scrollableWidth: 438px;"><div class="sticky-widget-lines" role="list" style="left: 0px;"></div></div></div></div><div data-mprt="9" class="minimap slider-mouseover" role="presentation" aria-hidden="true" style="position: absolute; left: 0px; width: 0px; height: 110px;"><div class="minimap-shadow-hidden" style="height: 110px;"></div><canvas width="0" height="110" style="position: absolute; left: 0px; width: 0px; height: 110px;"></canvas><canvas class="minimap-decorations-layer" width="0" height="110" style="position: absolute; left: 0px; width: 0px; height: 110px;"></canvas><div class="minimap-slider" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; width: 0px;"><div class="minimap-slider-horizontal" style="position: absolute; width: 0px; height: 0px;"></div></div></div><div role="presentation" aria-hidden="true" class="blockDecorations-container"></div></div><div data-mprt="2" class="overflowingContentWidgets"></div><div data-mprt="5" class="overflowingOverlayWidgets"></div></div></div></section></div></pre>
+    </li>
+  </ul>
+  <div class="qwen-markdown-space"></div>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text"
+      >Фаза 2: Упрощение AST Walker и Handlers</span
+    >
+  </h3>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text">2.1. Рефакторинг </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >ast_walker.py</code
+      ></strong
+    >
+  </div>
+  <ul class="qwen-markdown-list" dir="auto">
+    <li>
+      <span class="qwen-markdown-text">Убрать метод </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >_collect_inline()</code
+      ><span class="qwen-markdown-text">, сделать его приватным методом </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >InlineCollector</code
+      >
+    </li>
+    <li>
+      <span class="qwen-markdown-text">Упростить </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >_traverse()</code
+      ><span class="qwen-markdown-text"> до единого паттерна dispatch:</span>
+      <pre
+        class="qwen-markdown-code"
+      ><div class="qwen-markdown-code-header-wrapper"><div class="qwen-markdown-code-header" style="height: 36px;"><div>python</div><div class="qwen-markdown-code-header-actions"></div></div></div><div class="qwen-markdown-code-body python" style="overflow: hidden; height: 228px;"><section style="display: flex; position: relative; text-align: initial; width: 100%; height: 100%;"><div style="width: 100%; --vscode-editorCodeLens-lineHeight: 16px; --vscode-editorCodeLens-fontSize: 12px; --vscode-editorCodeLens-fontFeatureSettings: &quot;liga&quot; off, &quot;calt&quot; off;" data-keybinding-context="1000" data-mode-id="python"><div class="monaco-editor no-user-select  showUnused showDeprecated vs" role="code" data-uri="inmemory://model/716" style="width: 474px; height: 211px;"><div data-mprt="3" class="overflow-guard" style="width: 474px; height: 211px;"><div class="native-edit-context" autocorrect="off" autocapitalize="off" autocomplete="off" spellcheck="false" tabindex="0" role="textbox" aria-required="false" aria-multiline="true" aria-autocomplete="none" aria-roledescription="editor" aria-label="Editor content" style="tab-size: 28.5469px; text-wrap: nowrap; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; top: 0px; left: 30px; height: 19px;"></div><textarea class="ime-text-area" readonly="true" tabindex="-1" aria-hidden="true"></textarea><div class="margin" role="presentation" aria-hidden="true" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; height: 211px; width: 30px;"><div class="glyph-margin" style="left: 0px; width: 0px; height: 211px;"></div><div class="margin-view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="margin-view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 30px; height: 211px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-margin-both" style="width:30px"></div><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:14px;width:16px;"></div><div class="line-numbers active-line-number" style="left:0px;width:14px;">1</div></div><div style="top:19px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:14px;width:16px;"></div><div class="line-numbers" style="left:0px;width:14px;">2</div></div><div style="top:38px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">3</div></div><div style="top:57px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">4</div></div><div style="top:76px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">5</div></div><div style="top:95px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">6</div></div><div style="top:114px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:14px;width:16px;"></div><div class="line-numbers" style="left:0px;width:14px;">7</div></div><div style="top:133px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">8</div></div><div style="top:152px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:14px;width:16px;"></div><div class="line-numbers" style="left:0px;width:14px;">9</div></div><div style="top:171px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">10</div></div></div><div class="glyph-margin-widgets" style="position: absolute; top: 0px;"></div></div><div class="monaco-scrollable-element editor-scrollable vs" role="presentation" data-mprt="6" style="position: absolute; overflow: hidden; left: 30px; height: 211px; width: 444px;"><div class="lines-content monaco-editor-background" style="position: absolute; overflow: hidden; width: 1.67772e+07px; height: 1.67772e+07px; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; left: 0px;"><div class="view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; height: 0px; width: 549px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-exact" style="width:549px;"></div></div><div style="top:19px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:38px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div><div class="core-guide core-guide-indent lvl-1 vertical" style="left:28.546875px;width:7.13671875px"></div></div><div style="top:57px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div><div class="core-guide core-guide-indent lvl-1 vertical" style="left:28.546875px;width:7.13671875px"></div></div><div style="top:76px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:95px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:114px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:133px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div><div class="core-guide core-guide-indent lvl-1 vertical" style="left:28.546875px;width:7.13671875px"></div></div><div style="top:152px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:171px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div><div class="core-guide core-guide-indent lvl-1 vertical" style="left:28.546875px;width:7.13671875px"></div></div></div><div role="presentation" aria-hidden="true" class="view-rulers"></div><div class="view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="view-lines monaco-mouse-cursor-text" role="presentation" aria-hidden="true" data-mprt="8" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 549px; height: 211px;"><div style="top:0px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk24">def</span><span class="mtk1">&nbsp;_traverse</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk24">self</span><span class="mtk15">,</span><span class="mtk1">&nbsp;node</span><span class="mtk15">,</span><span class="mtk1">&nbsp;parent_id</span><span class="mtk15">,</span><span class="mtk1">&nbsp;index</span><span class="mtk15 bracket-highlighting-0">)</span><span class="mtk15">:</span></span></div><div style="top:19px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">if</span><span class="mtk1">&nbsp;node.</span><span class="mtk24">type</span><span class="mtk1">&nbsp;</span><span class="mtk24">in</span><span class="mtk1">&nbsp;</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk19">"root"</span><span class="mtk15">,</span><span class="mtk1">&nbsp;</span><span class="mtk19">"document"</span><span class="mtk15 bracket-highlighting-0">)</span><span class="mtk15">:</span></span></div><div style="top:38px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">self</span><span class="mtk1">._traverse_children</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk1">node</span><span class="mtk15">,</span><span class="mtk1">&nbsp;parent_id</span><span class="mtk15 bracket-highlighting-0">)</span></span></div><div style="top:57px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">return</span></span></div><div style="top:76px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div><div style="top:95px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;handler&nbsp;=&nbsp;</span><span class="mtk24">self</span><span class="mtk1">._get_handler_for_node</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk1">node</span><span class="mtk15 bracket-highlighting-0">)</span></span></div><div style="top:114px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">if</span><span class="mtk1">&nbsp;handler</span><span class="mtk15">:</span></span></div><div style="top:133px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;handler.handle</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk1">node</span><span class="mtk15">,</span><span class="mtk1">&nbsp;parent_id</span><span class="mtk15">,</span><span class="mtk1">&nbsp;index</span><span class="mtk15">,</span><span class="mtk1">&nbsp;</span><span class="mtk24">self</span><span class="mtk1">._traverse_children</span><span class="mtk15 bracket-highlighting-0">)</span></span></div><div style="top:152px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">else</span><span class="mtk15">:</span></span></div><div style="top:171px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">self</span><span class="mtk1">._traverse_children</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk1">node</span><span class="mtk15">,</span><span class="mtk1">&nbsp;parent_id</span><span class="mtk15 bracket-highlighting-0">)</span></span></div></div><div data-mprt="1" class="contentWidgets" style="position: absolute; top: 0px;"></div><div role="presentation" aria-hidden="true" class="cursors-layer cursor-line-style cursor-solid"><div class="cursor  monaco-mouse-cursor-text " style="height: 19px; top: 0px; left: 0px; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; display: block; visibility: hidden; padding-left: 0px; width: 2px;"></div></div></div><div role="presentation" aria-hidden="true" class="invisible scrollbar horizontal fade" style="position: absolute; width: 444px; height: 6px; left: 0px; bottom: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; height: 6px; transform: translate3d(0px, 0px, 0px); contain: strict; width: 359px;"></div></div><canvas class="decorationsOverviewRuler" aria-hidden="true" width="0" height="0" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; right: 0px; width: 14px; height: 211px; display: none;"></canvas><div role="presentation" aria-hidden="true" class="invisible scrollbar vertical" style="position: absolute; width: 0px; height: 211px; right: 0px; top: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; width: 14px; transform: translate3d(0px, 0px, 0px); contain: strict; height: 211px;"></div></div></div><div role="presentation" aria-hidden="true" style="width: 474px;"></div><div data-mprt="4" class="overlayWidgets" style="width: 474px;"><div class="sticky-widget" widgetid="editor.contrib.stickyScrollWidget" style="display: none; width: 460px; position: absolute; right: 50%; top: 0px;"><div class="sticky-widget-line-numbers" role="none" style="width: 30px;"></div><div class="sticky-widget-lines-scrollable" style="--vscode-editorStickyScroll-scrollableWidth: 535px;"><div class="sticky-widget-lines" role="list" style="left: 0px;"></div></div></div></div><div data-mprt="9" class="minimap slider-mouseover" role="presentation" aria-hidden="true" style="position: absolute; left: 0px; width: 0px; height: 211px;"><div class="minimap-shadow-hidden" style="height: 211px;"></div><canvas width="0" height="211" style="position: absolute; left: 0px; width: 0px; height: 211px;"></canvas><canvas class="minimap-decorations-layer" width="0" height="211" style="position: absolute; left: 0px; width: 0px; height: 211px;"></canvas><div class="minimap-slider" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; width: 0px;"><div class="minimap-slider-horizontal" style="position: absolute; width: 0px; height: 0px;"></div></div></div><div role="presentation" aria-hidden="true" class="blockDecorations-container"></div></div><div data-mprt="2" class="overflowingContentWidgets"></div><div data-mprt="5" class="overflowingOverlayWidgets"></div></div></div></section></div></pre>
+    </li>
+  </ul>
+  <div class="qwen-markdown-space"></div>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text"
+        >2.2. Объединить логику закрытия контекста</span
+      ></strong
+    >
+  </div>
+  <ul class="qwen-markdown-list" dir="auto">
+    <li>
+      <span class="qwen-markdown-text">В </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >ContextBlockHandler</code
+      ><span class="qwen-markdown-text"> убрать обработку </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto">_close</code
+      ><span class="qwen-markdown-text"> через отдельный метод</span>
+    </li>
+    <li>
+      <span class="qwen-markdown-text">Сделать единый метод </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >handle_open()</code
+      ><span class="qwen-markdown-text">
+        который возвращает callback для закрытия</span
+      >
+    </li>
+    <li>
+      <code class="qwen-markdown-codespan" style="cursor: auto"
+        >InlineCollector</code
+      ><span class="qwen-markdown-text">
+        не должен модифицировать стек контекстов</span
+      >
+    </li>
+  </ul>
+  <div class="qwen-markdown-space"></div>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text"
+        >2.3. Убрать циклическую зависимость</span
+      ></strong
+    >
+  </div>
+  <ul class="qwen-markdown-list" dir="auto">
+    <li>
+      <code class="qwen-markdown-codespan" style="cursor: auto"
+        >InlineCollector</code
+      ><span class="qwen-markdown-text"> не должен обращаться к </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >walker._context_block_handler</code
+      >
+    </li>
+    <li>
+      <span class="qwen-markdown-text"
+        >Передавать текущий контекст явно через параметры метода </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >collect()</code
+      >
+    </li>
+  </ul>
+  <div class="qwen-markdown-space"></div>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Фаза 3: Упрощение node_type.py</span>
+  </h3>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text"
+        >3.1. Заменить динамическую сборку на прямой словарь</span
+      ></strong
+    >
+  </div>
+  <pre
+    class="qwen-markdown-code"
+  ><div class="qwen-markdown-code-header-wrapper"><div class="qwen-markdown-code-header" style="height: 36px;"><div>python</div><div class="qwen-markdown-code-header-actions"></div></div></div><div class="qwen-markdown-code-body python" style="overflow: hidden; height: 203px;"><section style="display: flex; position: relative; text-align: initial; width: 100%; height: 100%;"><div style="width: 100%; --vscode-editorCodeLens-lineHeight: 16px; --vscode-editorCodeLens-fontSize: 12px; --vscode-editorCodeLens-fontFeatureSettings: &quot;liga&quot; off, &quot;calt&quot; off;" data-keybinding-context="1001" data-mode-id="python"><div class="monaco-editor no-user-select  showUnused showDeprecated vs" role="code" data-uri="inmemory://model/717" style="width: 501px; height: 186px;"><div data-mprt="3" class="overflow-guard" style="width: 501px; height: 186px;"><div class="native-edit-context" autocorrect="off" autocapitalize="off" autocomplete="off" spellcheck="false" tabindex="0" role="textbox" aria-required="false" aria-multiline="true" aria-autocomplete="none" aria-roledescription="editor" aria-label="Editor content" style="tab-size: 28.5469px; text-wrap: nowrap; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; top: 0px; left: 23px; height: 19px;"></div><textarea class="ime-text-area" readonly="true" tabindex="-1" aria-hidden="true"></textarea><div class="margin" role="presentation" aria-hidden="true" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; height: 186px; width: 23px;"><div class="glyph-margin" style="left: 0px; width: 0px; height: 186px;"></div><div class="margin-view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="margin-view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 23px; height: 186px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-margin-both" style="width:23px"></div><div class="line-numbers active-line-number" style="left:0px;width:7px;">1</div></div><div style="top:19px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:7px;width:16px;"></div><div class="line-numbers" style="left:0px;width:7px;">2</div></div><div style="top:38px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">3</div></div><div style="top:57px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">4</div></div><div style="top:76px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">5</div></div><div style="top:95px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">6</div></div><div style="top:114px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">7</div></div><div style="top:133px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">8</div></div><div style="top:152px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">9</div></div></div><div class="glyph-margin-widgets" style="position: absolute; top: 0px;"></div></div><div class="monaco-scrollable-element editor-scrollable vs" role="presentation" data-mprt="6" style="position: absolute; overflow: hidden; left: 23px; height: 186px; width: 478px;"><div class="lines-content monaco-editor-background" style="position: absolute; overflow: hidden; width: 1.67772e+07px; height: 1.67772e+07px; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; left: 0px;"><div class="view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; height: 0px; width: 478px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-exact" style="width:478px;"></div></div><div style="top:19px;height:19px;line-height:19px;"></div><div style="top:38px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:57px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:76px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:95px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:114px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:133px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:152px;height:19px;line-height:19px;"></div></div><div role="presentation" aria-hidden="true" class="view-rulers"></div><div class="view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="view-lines monaco-mouse-cursor-text" role="presentation" aria-hidden="true" data-mprt="8" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 478px; height: 186px;"><div style="top:0px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk10 mtki">#&nbsp;Вместо&nbsp;множественных&nbsp;set&nbsp;и&nbsp;циклов&nbsp;заполнения:</span></span></div><div style="top:19px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">NODE_TYPE_MAP&nbsp;=&nbsp;</span><span class="mtk15 bracket-highlighting-0">{</span></span></div><div style="top:38px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk10 mtki">#&nbsp;Context&nbsp;blocks</span></span></div><div style="top:57px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk19">"paragraph"</span><span class="mtk15">:</span><span class="mtk1">&nbsp;TranslationUnitType.CONTEXT_BLOCK</span><span class="mtk15">,</span></span></div><div style="top:76px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk19">"paragraph_open"</span><span class="mtk15">:</span><span class="mtk1">&nbsp;TranslationUnitType.CONTEXT_BLOCK</span><span class="mtk15">,</span></span></div><div style="top:95px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk19">"paragraph_close"</span><span class="mtk15">:</span><span class="mtk1">&nbsp;TranslationUnitType.CONTEXT_BLOCK</span><span class="mtk15">,</span></span></div><div style="top:114px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk19">"heading"</span><span class="mtk15">:</span><span class="mtk1">&nbsp;TranslationUnitType.CONTEXT_BLOCK</span><span class="mtk15">,</span></span></div><div style="top:133px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk10 mtki">#&nbsp;...&nbsp;и&nbsp;так&nbsp;далее&nbsp;явно</span></span></div><div style="top:152px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk15 bracket-highlighting-0">}</span></span></div></div><div data-mprt="1" class="contentWidgets" style="position: absolute; top: 0px;"></div><div role="presentation" aria-hidden="true" class="cursors-layer cursor-line-style cursor-solid"><div class="cursor  monaco-mouse-cursor-text " style="height: 19px; top: 0px; left: 0px; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; display: block; visibility: hidden; padding-left: 0px; width: 2px;"></div></div></div><div role="presentation" aria-hidden="true" class="invisible scrollbar horizontal" style="position: absolute; width: 478px; height: 6px; left: 0px; bottom: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; height: 6px; transform: translate3d(0px, 0px, 0px); contain: strict; width: 478px;"></div></div><canvas class="decorationsOverviewRuler" aria-hidden="true" width="0" height="0" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; right: 0px; width: 14px; height: 186px; display: none;"></canvas><div role="presentation" aria-hidden="true" class="invisible scrollbar vertical" style="position: absolute; width: 0px; height: 186px; right: 0px; top: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; width: 14px; transform: translate3d(0px, 0px, 0px); contain: strict; height: 186px;"></div></div></div><div role="presentation" aria-hidden="true" style="width: 501px;"></div><div data-mprt="4" class="overlayWidgets" style="width: 501px;"><div class="sticky-widget" widgetid="editor.contrib.stickyScrollWidget" style="display: none; width: 487px; position: absolute; right: 50%; top: 0px;"><div class="sticky-widget-line-numbers" role="none" style="width: 23px;"></div><div class="sticky-widget-lines-scrollable" style="--vscode-editorStickyScroll-scrollableWidth: 464px;"><div class="sticky-widget-lines" role="list" style="left: 0px;"></div></div></div></div><div data-mprt="9" class="minimap slider-mouseover" role="presentation" aria-hidden="true" style="position: absolute; left: 0px; width: 0px; height: 186px;"><div class="minimap-shadow-hidden" style="height: 186px;"></div><canvas width="0" height="186" style="position: absolute; left: 0px; width: 0px; height: 186px;"></canvas><canvas class="minimap-decorations-layer" width="0" height="186" style="position: absolute; left: 0px; width: 0px; height: 186px;"></canvas><div class="minimap-slider" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; width: 0px;"><div class="minimap-slider-horizontal" style="position: absolute; width: 0px; height: 0px;"></div></div></div><div role="presentation" aria-hidden="true" class="blockDecorations-container"></div></div><div data-mprt="2" class="overflowingContentWidgets"></div><div data-mprt="5" class="overflowingOverlayWidgets"></div></div></div></section></div></pre>
+  <ul class="qwen-markdown-list" dir="auto">
+    <li>
+      <span class="qwen-markdown-text">Удалить </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >_BLOCK_TYPES</code
+      ><span class="qwen-markdown-text">, </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >_INLINE_TRANSLATE_PAIRED</code
+      ><span class="qwen-markdown-text"> и другие промежуточные множества</span>
+    </li>
+    <li>
+      <span class="qwen-markdown-text">Оставить только </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >get_unit_type()</code
+      ><span class="qwen-markdown-text"> с прямым lookup</span>
+    </li>
+  </ul>
+  <div class="qwen-markdown-space"></div>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Фаза 4: Изоляция PlaceholderManager</span>
+  </h3>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text"
+        >4.1. Разделить ответственность</span
+      ></strong
+    >
+  </div>
+  <ul class="qwen-markdown-list" dir="auto">
+    <li>
+      <span class="qwen-markdown-text">Создать </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >PlaceholderIdManager</code
+      ><span class="qwen-markdown-text"> — только генерация ID и маппинг</span>
+    </li>
+    <li>
+      <span class="qwen-markdown-text">Создать </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >MarkupExtractor</code
+      ><span class="qwen-markdown-text">
+        — извлечение original_markup из узла</span
+      >
+    </li>
+    <li>
+      <code class="qwen-markdown-codespan" style="cursor: auto"
+        >Placeholder</code
+      ><span class="qwen-markdown-text">
+        сделать frozen dataclass без методов</span
+      >
+    </li>
+  </ul>
+  <div class="qwen-markdown-space"></div>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text">4.2. Убрать </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >_create_closing_placeholder()</code
+      ></strong
+    >
+  </div>
+  <ul class="qwen-markdown-list" dir="auto">
+    <li>
+      <span class="qwen-markdown-text"
+        >Вместо этого создавать оба placeholder одновременно при обработке
+        парного тега</span
+      >
+    </li>
+    <li>
+      <span class="qwen-markdown-text">Использовать один ID для обоих</span>
+    </li>
+  </ul>
+  <div class="qwen-markdown-space"></div>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Фаза 5: Очистка Chunker</span>
+  </h3>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text">5.1. Удалить </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >_fallback_align_segments()</code
+      ></strong
+    >
+  </div>
+  <ul class="qwen-markdown-list" dir="auto">
+    <li>
+      <span class="qwen-markdown-text"
+        >Если аномалии NLLB редки — вынести в отдельный модуль </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >chunker_fallback.py</code
+      >
+    </li>
+    <li>
+      <span class="qwen-markdown-text"
+        >Подключать только через опцию конфига</span
+      >
+    </li>
+  </ul>
+  <div class="qwen-markdown-space"></div>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text">5.2. Выделить </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >SentenceSplitter</code
+      ></strong
+    >
+  </div>
+  <ul class="qwen-markdown-list" dir="auto">
+    <li>
+      <span class="qwen-markdown-text">Метод </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >split_sentences</code
+      ><span class="qwen-markdown-text"> сейчас импортируется из </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto">utils</code>
+    </li>
+    <li>
+      <span class="qwen-markdown-text"
+        >Создать класс-обертку для языково-зависимого сплиттера</span
+      >
+    </li>
+  </ul>
+  <div class="qwen-markdown-space"></div>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Фаза 6: Упрощение MarkdownTranslator</span>
+  </h3>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text"
+        >6.1. Lazy initialization компонентов</span
+      ></strong
+    >
+  </div>
+  <pre
+    class="qwen-markdown-code"
+  ><div class="qwen-markdown-code-header-wrapper"><div class="qwen-markdown-code-header" style="height: 36px;"><div>python</div><div class="qwen-markdown-code-header-actions"></div></div></div><div class="qwen-markdown-code-body python" style="overflow: hidden; height: 241px;"><section style="display: flex; position: relative; text-align: initial; width: 100%; height: 100%;"><div style="width: 100%; --vscode-editorCodeLens-lineHeight: 16px; --vscode-editorCodeLens-fontSize: 12px; --vscode-editorCodeLens-fontFeatureSettings: &quot;liga&quot; off, &quot;calt&quot; off;" data-keybinding-context="1002" data-mode-id="python"><div class="monaco-editor no-user-select  showUnused showDeprecated vs" role="code" data-uri="inmemory://model/718" style="width: 500px; height: 224px;"><div data-mprt="3" class="overflow-guard" style="width: 500px; height: 224px;"><div class="native-edit-context" autocorrect="off" autocapitalize="off" autocomplete="off" spellcheck="false" tabindex="0" role="textbox" aria-required="false" aria-multiline="true" aria-autocomplete="none" aria-roledescription="editor" aria-label="Editor content" style="tab-size: 28.5469px; text-wrap: nowrap; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; top: 0px; left: 30px; height: 19px;"></div><textarea class="ime-text-area" readonly="true" tabindex="-1" aria-hidden="true"></textarea><div class="margin" role="presentation" aria-hidden="true" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; height: 224px; width: 30px;"><div class="glyph-margin" style="left: 0px; width: 0px; height: 224px;"></div><div class="margin-view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="margin-view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 30px; height: 224px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-margin-both" style="width:30px"></div><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:14px;width:16px;"></div><div class="line-numbers active-line-number" style="left:0px;width:14px;">1</div></div><div style="top:19px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">2</div></div><div style="top:38px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">3</div></div><div style="top:57px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">4</div></div><div style="top:76px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">5</div></div><div style="top:95px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">6</div></div><div style="top:114px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">7</div></div><div style="top:133px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:14px;width:16px;"></div><div class="line-numbers" style="left:0px;width:14px;">8</div></div><div style="top:152px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:14px;width:16px;"></div><div class="line-numbers" style="left:0px;width:14px;">9</div></div><div style="top:171px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">10</div></div><div style="top:190px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">11</div></div></div><div class="glyph-margin-widgets" style="position: absolute; top: 0px;"></div></div><div class="monaco-scrollable-element editor-scrollable vs" role="presentation" data-mprt="6" style="position: absolute; overflow: hidden; left: 30px; height: 224px; width: 470px;"><div class="lines-content monaco-editor-background" style="position: absolute; overflow: hidden; width: 1.67772e+07px; height: 1.67772e+07px; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; left: 0px;"><div class="view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; height: 0px; width: 470px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-exact" style="width:470px;"></div></div><div style="top:19px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:38px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:57px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:76px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:95px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:114px;height:19px;line-height:19px;"></div><div style="top:133px;height:19px;line-height:19px;"></div><div style="top:152px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:171px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div><div class="core-guide core-guide-indent lvl-1 vertical" style="left:28.546875px;width:7.13671875px"></div></div><div style="top:190px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div></div><div role="presentation" aria-hidden="true" class="view-rulers"></div><div class="view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="view-lines monaco-mouse-cursor-text" role="presentation" aria-hidden="true" data-mprt="8" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 470px; height: 224px;"><div style="top:0px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk24">def</span><span class="mtk1">&nbsp;</span><span class="mtk24">__init__</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk24">self</span><span class="mtk15">,</span><span class="mtk1">&nbsp;text</span><span class="mtk15">,</span><span class="mtk1">&nbsp;src_lang</span><span class="mtk15">,</span><span class="mtk1">&nbsp;tgt_lang</span><span class="mtk15">,</span><span class="mtk1">&nbsp;engine</span><span class="mtk15 bracket-highlighting-0">)</span><span class="mtk15">:</span></span></div><div style="top:19px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">self</span><span class="mtk1">.text&nbsp;=&nbsp;text</span></span></div><div style="top:38px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">self</span><span class="mtk1">.src_lang&nbsp;=&nbsp;src_lang</span></span></div><div style="top:57px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">self</span><span class="mtk1">.tgt_lang&nbsp;=&nbsp;tgt_lang</span></span></div><div style="top:76px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">self</span><span class="mtk1">.engine&nbsp;=&nbsp;engine</span></span></div><div style="top:95px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk10 mtki">#&nbsp;Не&nbsp;создаем&nbsp;компоненты&nbsp;здесь</span></span></div><div style="top:114px;height:19px;line-height:19px;" class="view-line"><span><span></span></span></div><div style="top:133px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk24">def</span><span class="mtk1">&nbsp;_get_chunker</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk24">self</span><span class="mtk15 bracket-highlighting-0">)</span><span class="mtk15">:</span></span></div><div style="top:152px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">if</span><span class="mtk1">&nbsp;</span><span class="mtk24">not</span><span class="mtk1">&nbsp;</span><span class="mtk24">hasattr</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk24">self</span><span class="mtk15">,</span><span class="mtk1">&nbsp;</span><span class="mtk19">'_chunker'</span><span class="mtk15 bracket-highlighting-0">)</span><span class="mtk15">:</span></span></div><div style="top:171px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">self</span><span class="mtk1">._chunker&nbsp;=&nbsp;MarkdownChunker</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk1">...</span><span class="mtk15 bracket-highlighting-0">)</span></span></div><div style="top:190px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">return</span><span class="mtk1">&nbsp;</span><span class="mtk24">self</span><span class="mtk1">._chunker</span></span></div></div><div data-mprt="1" class="contentWidgets" style="position: absolute; top: 0px;"></div><div role="presentation" aria-hidden="true" class="cursors-layer cursor-line-style cursor-solid"><div class="cursor  monaco-mouse-cursor-text " style="height: 19px; top: 0px; left: 0px; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; display: block; visibility: hidden; padding-left: 0px; width: 2px;"></div></div></div><div role="presentation" aria-hidden="true" class="invisible scrollbar horizontal" style="position: absolute; width: 470px; height: 6px; left: 0px; bottom: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; height: 6px; transform: translate3d(0px, 0px, 0px); contain: strict; width: 470px;"></div></div><canvas class="decorationsOverviewRuler" aria-hidden="true" width="0" height="0" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; right: 0px; width: 14px; height: 224px; display: none;"></canvas><div role="presentation" aria-hidden="true" class="invisible scrollbar vertical" style="position: absolute; width: 0px; height: 224px; right: 0px; top: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; width: 14px; transform: translate3d(0px, 0px, 0px); contain: strict; height: 224px;"></div></div></div><div role="presentation" aria-hidden="true" style="width: 500px;"></div><div data-mprt="4" class="overlayWidgets" style="width: 500px;"><div class="sticky-widget" widgetid="editor.contrib.stickyScrollWidget" style="display: none; width: 486px; position: absolute; right: 50%; top: 0px;"><div class="sticky-widget-line-numbers" role="none" style="width: 30px;"></div><div class="sticky-widget-lines-scrollable" style="--vscode-editorStickyScroll-scrollableWidth: 456px;"><div class="sticky-widget-lines" role="list" style="left: 0px;"></div></div></div></div><div data-mprt="9" class="minimap slider-mouseover" role="presentation" aria-hidden="true" style="position: absolute; left: 0px; width: 0px; height: 224px;"><div class="minimap-shadow-hidden" style="height: 224px;"></div><canvas width="0" height="224" style="position: absolute; left: 0px; width: 0px; height: 224px;"></canvas><canvas class="minimap-decorations-layer" width="0" height="224" style="position: absolute; left: 0px; width: 0px; height: 224px;"></canvas><div class="minimap-slider" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; width: 0px;"><div class="minimap-slider-horizontal" style="position: absolute; width: 0px; height: 0px;"></div></div></div><div role="presentation" aria-hidden="true" class="blockDecorations-container"></div></div><div data-mprt="2" class="overflowingContentWidgets"></div><div data-mprt="5" class="overflowingOverlayWidgets"></div></div></div></section></div></pre>
+  <div class="qwen-markdown-space"></div>
+  <div class="qwen-markdown-paragraph">
+    <strong class="qwen-markdown-strong"
+      ><span class="qwen-markdown-text"
+        >6.2. Выделить конфигурацию в отдельный dataclass</span
+      ></strong
+    >
+  </div>
+  <pre
+    class="qwen-markdown-code"
+  ><div class="qwen-markdown-code-header-wrapper"><div class="qwen-markdown-code-header" style="height: 36px;"><div>python</div><div class="qwen-markdown-code-header-actions"></div></div></div><div class="qwen-markdown-code-body python" style="overflow: hidden; height: 190px;"><section style="display: flex; position: relative; text-align: initial; width: 100%; height: 100%;"><div style="width: 100%; --vscode-editorCodeLens-lineHeight: 16px; --vscode-editorCodeLens-fontSize: 12px; --vscode-editorCodeLens-fontFeatureSettings: &quot;liga&quot; off, &quot;calt&quot; off;" data-keybinding-context="1003" data-mode-id="python"><div class="monaco-editor no-user-select  showUnused showDeprecated vs" role="code" data-uri="inmemory://model/719" style="width: 500px; height: 173px;"><div data-mprt="3" class="overflow-guard" style="width: 500px; height: 173px;"><div class="native-edit-context" autocorrect="off" autocapitalize="off" autocomplete="off" spellcheck="false" tabindex="0" role="textbox" aria-required="false" aria-multiline="true" aria-autocomplete="none" aria-roledescription="editor" aria-label="Editor content" style="tab-size: 28.5469px; text-wrap: nowrap; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; top: 0px; left: 23px; height: 19px;"></div><textarea class="ime-text-area" readonly="true" tabindex="-1" aria-hidden="true"></textarea><div class="margin" role="presentation" aria-hidden="true" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; height: 173px; width: 23px;"><div class="glyph-margin" style="left: 0px; width: 0px; height: 173px;"></div><div class="margin-view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="margin-view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 23px; height: 173px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-margin-both" style="width:23px"></div><div class="line-numbers active-line-number" style="left:0px;width:7px;">1</div></div><div style="top:19px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:7px;width:16px;"></div><div class="line-numbers" style="left:0px;width:7px;">2</div></div><div style="top:38px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">3</div></div><div style="top:57px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">4</div></div><div style="top:76px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">5</div></div><div style="top:95px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:7px;width:16px;"></div><div class="line-numbers" style="left:0px;width:7px;">6</div></div><div style="top:114px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:7px;width:16px;"></div><div class="line-numbers" style="left:0px;width:7px;">7</div></div><div style="top:133px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:7px;">8</div></div></div><div class="glyph-margin-widgets" style="position: absolute; top: 0px;"></div></div><div class="monaco-scrollable-element editor-scrollable vs" role="presentation" data-mprt="6" style="position: absolute; overflow: hidden; left: 23px; height: 173px; width: 477px;"><div class="lines-content monaco-editor-background" style="position: absolute; overflow: hidden; width: 1.67772e+07px; height: 1.67772e+07px; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; left: 0px;"><div class="view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; height: 0px; width: 542px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-exact" style="width:542px;"></div></div><div style="top:19px;height:19px;line-height:19px;"></div><div style="top:38px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:57px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:76px;height:19px;line-height:19px;"></div><div style="top:95px;height:19px;line-height:19px;"></div><div style="top:114px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:133px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div><div class="core-guide core-guide-indent lvl-1 vertical" style="left:28.546875px;width:7.13671875px"></div></div></div><div role="presentation" aria-hidden="true" class="view-rulers"></div><div class="view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="view-lines monaco-mouse-cursor-text" role="presentation" aria-hidden="true" data-mprt="8" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 542px; height: 173px;"><div style="top:0px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk26">@dataclass</span></span></div><div style="top:19px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk24">class</span><span class="mtk1">&nbsp;MarkdownTranslatorConfig</span><span class="mtk15">:</span></span></div><div style="top:38px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;max_tokens</span><span class="mtk15">:</span><span class="mtk1">&nbsp;</span><span class="mtk24">int</span></span></div><div style="top:57px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;debug_mode</span><span class="mtk15">:</span><span class="mtk1">&nbsp;</span><span class="mtk24">bool</span></span></div><div style="top:76px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div><div style="top:95px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk24">class</span><span class="mtk1">&nbsp;MarkdownTranslator</span><span class="mtk15">:</span></span></div><div style="top:114px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">def</span><span class="mtk1">&nbsp;</span><span class="mtk24">__init__</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk24">self</span><span class="mtk15">,</span><span class="mtk1">&nbsp;text</span><span class="mtk15">,</span><span class="mtk1">&nbsp;src_lang</span><span class="mtk15">,</span><span class="mtk1">&nbsp;tgt_lang</span><span class="mtk15">,</span><span class="mtk1">&nbsp;engine</span><span class="mtk15">,</span><span class="mtk1">&nbsp;config=</span><span class="mtk24">None</span><span class="mtk15 bracket-highlighting-0">)</span><span class="mtk15">:</span></span></div><div style="top:133px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="mtk24">self</span><span class="mtk1">.config&nbsp;=&nbsp;config&nbsp;</span><span class="mtk24">or</span><span class="mtk1">&nbsp;MarkdownTranslatorConfig</span><span class="mtk15 bracket-highlighting-0">(</span><span class="mtk1">...</span><span class="mtk15 bracket-highlighting-0">)</span></span></div></div><div data-mprt="1" class="contentWidgets" style="position: absolute; top: 0px;"></div><div role="presentation" aria-hidden="true" class="cursors-layer cursor-line-style cursor-solid"><div class="cursor  monaco-mouse-cursor-text " style="height: 19px; top: 0px; left: 0px; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; display: block; visibility: hidden; padding-left: 0px; width: 2px;"></div></div></div><div role="presentation" aria-hidden="true" class="invisible scrollbar horizontal fade" style="position: absolute; width: 477px; height: 6px; left: 0px; bottom: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; height: 6px; transform: translate3d(0px, 0px, 0px); contain: strict; width: 419px;"></div></div><canvas class="decorationsOverviewRuler" aria-hidden="true" width="0" height="0" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; right: 0px; width: 14px; height: 173px; display: none;"></canvas><div role="presentation" aria-hidden="true" class="invisible scrollbar vertical" style="position: absolute; width: 0px; height: 173px; right: 0px; top: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; width: 14px; transform: translate3d(0px, 0px, 0px); contain: strict; height: 173px;"></div></div></div><div role="presentation" aria-hidden="true" style="width: 500px;"></div><div data-mprt="4" class="overlayWidgets" style="width: 500px;"><div class="sticky-widget" widgetid="editor.contrib.stickyScrollWidget" style="display: none; width: 486px; position: absolute; right: 50%; top: 0px;"><div class="sticky-widget-line-numbers" role="none" style="width: 23px;"></div><div class="sticky-widget-lines-scrollable" style="--vscode-editorStickyScroll-scrollableWidth: 528px;"><div class="sticky-widget-lines" role="list" style="left: 0px;"></div></div></div></div><div data-mprt="9" class="minimap slider-mouseover" role="presentation" aria-hidden="true" style="position: absolute; left: 0px; width: 0px; height: 173px;"><div class="minimap-shadow-hidden" style="height: 173px;"></div><canvas width="0" height="173" style="position: absolute; left: 0px; width: 0px; height: 173px;"></canvas><canvas class="minimap-decorations-layer" width="0" height="173" style="position: absolute; left: 0px; width: 0px; height: 173px;"></canvas><div class="minimap-slider" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; width: 0px;"><div class="minimap-slider-horizontal" style="position: absolute; width: 0px; height: 0px;"></div></div></div><div role="presentation" aria-hidden="true" class="blockDecorations-container"></div></div><div data-mprt="2" class="overflowingContentWidgets"></div><div data-mprt="5" class="overflowingOverlayWidgets"></div></div></div></section></div></pre>
+  <div class="qwen-markdown-space"></div>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Фаза 7: Новая структура модуля</span>
+  </h3>
+  <pre
+    class="qwen-markdown-code"
+  ><div class="qwen-markdown-code-header-wrapper"><div class="qwen-markdown-code-header" style="height: 36px;"><div></div><div class="qwen-markdown-code-header-actions"></div></div></div><div class="qwen-markdown-code-body" style="overflow: hidden; height: 437px;"><section style="display: flex; position: relative; text-align: initial; width: 100%; height: 100%;"><div style="width: 100%; --vscode-editorCodeLens-lineHeight: 16px; --vscode-editorCodeLens-fontSize: 12px; --vscode-editorCodeLens-fontFeatureSettings: &quot;liga&quot; off, &quot;calt&quot; off;" data-keybinding-context="1004" data-mode-id="plaintext"><div class="monaco-editor no-user-select  showUnused showDeprecated vs" role="code" data-uri="inmemory://model/720" style="width: 500px; height: 420px;"><div data-mprt="3" class="overflow-guard" style="width: 500px; height: 420px;"><div class="native-edit-context" autocorrect="off" autocapitalize="off" autocomplete="off" spellcheck="false" tabindex="0" role="textbox" aria-required="false" aria-multiline="true" aria-autocomplete="none" aria-roledescription="editor" aria-label="Editor content" style="tab-size: 28.5469px; text-wrap: nowrap; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; top: 0px; left: 30px; height: 19px;"></div><textarea class="ime-text-area" readonly="true" tabindex="-1" aria-hidden="true"></textarea><div class="margin" role="presentation" aria-hidden="true" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; height: 420px; width: 30px;"><div class="glyph-margin" style="left: 0px; width: 0px; height: 420px;"></div><div class="margin-view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="margin-view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 30px; height: 420px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-margin-both" style="width:30px"></div><div class="line-numbers active-line-number" style="left:0px;width:14px;">1</div></div><div style="top:19px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">2</div></div><div style="top:38px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">3</div></div><div style="top:57px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">4</div></div><div style="top:76px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">5</div></div><div style="top:95px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">6</div></div><div style="top:114px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">7</div></div><div style="top:133px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">8</div></div><div style="top:152px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">9</div></div><div style="top:171px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">10</div></div><div style="top:190px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">11</div></div><div style="top:209px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">12</div></div><div style="top:228px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">13</div></div><div style="top:247px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">14</div></div><div style="top:266px;height:19px;line-height:19px;"><div class="cldr codicon codicon-folding-expanded" title="Click to collapse the range." style="left:14px;width:16px;"></div><div class="line-numbers" style="left:0px;width:14px;">15</div></div><div style="top:285px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">16</div></div><div style="top:304px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">17</div></div><div style="top:323px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">18</div></div><div style="top:342px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">19</div></div><div style="top:361px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">20</div></div><div style="top:380px;height:19px;line-height:19px;"><div class="line-numbers" style="left:0px;width:14px;">21</div></div></div><div class="glyph-margin-widgets" style="position: absolute; top: 0px;"></div></div><div class="monaco-scrollable-element editor-scrollable vs" role="presentation" data-mprt="6" style="position: absolute; overflow: hidden; left: 30px; height: 420px; width: 470px;"><div class="lines-content monaco-editor-background" style="position: absolute; overflow: hidden; width: 1.67772e+07px; height: 1.67772e+07px; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; left: 0px;"><div class="view-overlays" role="presentation" aria-hidden="true" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; height: 0px; width: 599px;"><div style="top:0px;height:19px;line-height:19px;"><div class="current-line current-line-exact" style="width:599px;"></div></div><div style="top:19px;height:19px;line-height:19px;"></div><div style="top:38px;height:19px;line-height:19px;"></div><div style="top:57px;height:19px;line-height:19px;"></div><div style="top:76px;height:19px;line-height:19px;"></div><div style="top:95px;height:19px;line-height:19px;"></div><div style="top:114px;height:19px;line-height:19px;"></div><div style="top:133px;height:19px;line-height:19px;"></div><div style="top:152px;height:19px;line-height:19px;"></div><div style="top:171px;height:19px;line-height:19px;"></div><div style="top:190px;height:19px;line-height:19px;"></div><div style="top:209px;height:19px;line-height:19px;"></div><div style="top:228px;height:19px;line-height:19px;"></div><div style="top:247px;height:19px;line-height:19px;"></div><div style="top:266px;height:19px;line-height:19px;"></div><div style="top:285px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:304px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:323px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:342px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:361px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div><div style="top:380px;height:19px;line-height:19px;"><div class="core-guide core-guide-indent lvl-0 vertical" style="left:0px;width:7.13671875px"></div></div></div><div role="presentation" aria-hidden="true" class="view-rulers"></div><div class="view-zones" role="presentation" aria-hidden="true" style="position: absolute;"></div><div class="view-lines monaco-mouse-cursor-text" role="presentation" aria-hidden="true" data-mprt="8" style="position: absolute; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; width: 599px; height: 420px;"><div style="top:0px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">markdown2/</span></span></div><div style="top:19px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;__init__.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;публичный&nbsp;API&nbsp;</span><span class="mtk1">(MarkdownTranslator)</span></span></div><div style="top:38px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;translator.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;было&nbsp;</span><span class="mtk1">markdown_translator.py</span></span></div><div style="top:57px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;parser.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;без&nbsp;изменений</span></span></div><div style="top:76px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;ast_walker.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;упрощенный&nbsp;</span><span class="mtk1">dispatcher</span></span></div><div style="top:95px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;chunker.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;без&nbsp;fallback</span></span></div><div style="top:114px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;reconstructor/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;без&nbsp;изменений&nbsp;</span><span class="mtk1">(уже&nbsp;хорошо)</span></span></div><div style="top:133px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;types.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;было&nbsp;</span><span class="mtk1">translation_unit_type.py&nbsp;+&nbsp;node_type.py</span></span></div><div style="top:152px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;units.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;было&nbsp;</span><span class="mtk1">translation_unit.py&nbsp;+&nbsp;unit_factory.py</span></span></div><div style="top:171px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">├──&nbsp;placeholders/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;новый&nbsp;подмодуль</span></span></div><div style="top:190px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">│&nbsp;&nbsp;&nbsp;├──&nbsp;__init__.py</span></span></div><div style="top:209px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">│&nbsp;&nbsp;&nbsp;├──&nbsp;models.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Placeholder&nbsp;</span><span class="mtk1">dataclass</span></span></div><div style="top:228px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">│&nbsp;&nbsp;&nbsp;├──&nbsp;id_manager.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;генерация&nbsp;ID</span></span></div><div style="top:247px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">│&nbsp;&nbsp;&nbsp;└──&nbsp;markup_extractor.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;извлечение&nbsp;</span><span class="mtk1">разметки</span></span></div><div style="top:266px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">└──&nbsp;handlers/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;упрощенные</span></span></div><div style="top:285px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;__init__.py</span></span></div><div style="top:304px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;base.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;базовый&nbsp;класс&nbsp;</span><span class="mtk1">Handler</span></span></div><div style="top:323px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;context.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;было&nbsp;</span><span class="mtk1">context_block_handler.py</span></span></div><div style="top:342px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;structural.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;было&nbsp;</span><span class="mtk1">structural_block_handler.py</span></span></div><div style="top:361px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;special.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;было&nbsp;</span><span class="mtk1">special_case_handler.py</span></span></div><div style="top:380px;height:19px;line-height:19px;" class="view-line"><span><span class="mtk1">&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;inline.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;было&nbsp;</span><span class="mtk1">inline_collector.py</span></span></div></div><div data-mprt="1" class="contentWidgets" style="position: absolute; top: 0px;"></div><div role="presentation" aria-hidden="true" class="cursors-layer cursor-line-style cursor-solid"><div class="cursor  monaco-mouse-cursor-text " style="height: 19px; top: 0px; left: 0px; font-family: ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace, Consolas, &quot;Courier New&quot;, monospace; font-weight: normal; font-size: 14px; font-feature-settings: &quot;liga&quot; 0, &quot;calt&quot; 0; font-variation-settings: normal; line-height: 19px; letter-spacing: -0.56px; display: block; visibility: hidden; padding-left: 0px; width: 2px;"></div></div></div><div role="presentation" aria-hidden="true" class="invisible scrollbar horizontal fade" style="position: absolute; width: 470px; height: 6px; left: 0px; bottom: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; height: 6px; transform: translate3d(0px, 0px, 0px); contain: strict; width: 368px;"></div></div><canvas class="decorationsOverviewRuler" aria-hidden="true" width="0" height="0" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; top: 0px; right: 0px; width: 14px; height: 420px; display: none;"></canvas><div role="presentation" aria-hidden="true" class="invisible scrollbar vertical" style="position: absolute; width: 0px; height: 420px; right: 0px; top: 0px;"><div class="slider" style="position: absolute; top: 0px; left: 0px; width: 14px; transform: translate3d(0px, 0px, 0px); contain: strict; height: 420px;"></div></div></div><div role="presentation" aria-hidden="true" style="width: 500px;"></div><div data-mprt="4" class="overlayWidgets" style="width: 500px;"><div class="sticky-widget" widgetid="editor.contrib.stickyScrollWidget" style="display: none; width: 486px; position: absolute; right: 50%; top: 0px;"><div class="sticky-widget-line-numbers" role="none" style="width: 30px;"></div><div class="sticky-widget-lines-scrollable" style="--vscode-editorStickyScroll-scrollableWidth: 585px;"><div class="sticky-widget-lines" role="list" style="left: 0px;"></div></div></div></div><div data-mprt="9" class="minimap slider-mouseover" role="presentation" aria-hidden="true" style="position: absolute; left: 0px; width: 0px; height: 420px;"><div class="minimap-shadow-hidden" style="height: 420px;"></div><canvas width="0" height="420" style="position: absolute; left: 0px; width: 0px; height: 420px;"></canvas><canvas class="minimap-decorations-layer" width="0" height="420" style="position: absolute; left: 0px; width: 0px; height: 420px;"></canvas><div class="minimap-slider" style="position: absolute; transform: translate3d(0px, 0px, 0px); contain: strict; width: 0px;"><div class="minimap-slider-horizontal" style="position: absolute; width: 0px; height: 0px;"></div></div></div><div role="presentation" aria-hidden="true" class="blockDecorations-container"></div></div><div data-mprt="2" class="overflowingContentWidgets"><div class="monaco-resizable-hover" widgetid="editor.contrib.resizableContentHoverWidget" style="position: absolute; height: 27px; width: 150px; z-index: 50; display: none; visibility: hidden; max-width: 941px;"><div class="monaco-sash vertical" style="left: 148px;"></div><div class="monaco-sash vertical" style="left: -2px;"></div><div class="monaco-sash orthogonal-edge-north horizontal" style="top: -2px;"><div class="orthogonal-drag-handle start"></div><div class="orthogonal-drag-handle end"></div></div><div class="monaco-sash orthogonal-edge-south horizontal" style="top: 25px;"><div class="orthogonal-drag-handle start"></div><div class="orthogonal-drag-handle end"></div></div><div class="monaco-hover fade-in hidden" tabindex="0" role="tooltip"><div class="monaco-scrollable-element " role="presentation" style="position: relative; overflow: hidden;"><div class="monaco-hover-content" style="overflow: hidden;"></div><div role="presentation" aria-hidden="true" class="invisible scrollbar horizontal" style="position: absolute;"><div class="slider" style="position: absolute; top: 0px; left: 0px; height: 10px; transform: translate3d(0px, 0px, 0px); contain: strict;"></div></div><div role="presentation" aria-hidden="true" class="invisible scrollbar vertical" style="position: absolute;"><div class="slider" style="position: absolute; top: 0px; left: 0px; width: 10px; transform: translate3d(0px, 0px, 0px); contain: strict;"></div></div><div class="shadow"></div><div class="shadow"></div><div class="shadow"></div></div></div></div></div><div data-mprt="5" class="overflowingOverlayWidgets"><div class="monaco-hover fade-in hidden" tabindex="0" role="tooltip" widgetid="editor.contrib.modesGlyphHoverWidget" style="position: absolute;"><div class="monaco-scrollable-element " role="presentation" style="position: relative; overflow: hidden;"><div class="monaco-hover-content" style="overflow: hidden;"></div><div role="presentation" aria-hidden="true" class="invisible scrollbar horizontal" style="position: absolute;"><div class="slider" style="position: absolute; top: 0px; left: 0px; height: 10px; transform: translate3d(0px, 0px, 0px); contain: strict;"></div></div><div role="presentation" aria-hidden="true" class="invisible scrollbar vertical" style="position: absolute;"><div class="slider" style="position: absolute; top: 0px; left: 0px; width: 10px; transform: translate3d(0px, 0px, 0px); contain: strict;"></div></div><div class="shadow"></div><div class="shadow"></div><div class="shadow"></div></div></div></div></div></div></section></div></pre>
+  <div class="qwen-markdown-space"></div>
+  <h3 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Итоговые метрики после рефакторинга</span>
+  </h3>
+  <div class="qwen-markdown-table-wrapper">
+    <div class="qwen-markdown-table-scroll-wrapper">
+      <table class="qwen-markdown-table">
+        <thead class="qwen-markdown-table-thead">
+          <tr class="qwen-markdown-table-thead-tr">
+            <th scope="col" class="qwen-markdown-table-thead-tr-th">
+              <div class="qwen-markdown-table-thead-tr-th-col">
+                <span class="qwen-markdown-text">Файл</span>
+              </div>
+            </th>
+            <th scope="col" class="qwen-markdown-table-thead-tr-th">
+              <div class="qwen-markdown-table-thead-tr-th-col">
+                <span class="qwen-markdown-text">Сейчас</span>
+              </div>
+            </th>
+            <th scope="col" class="qwen-markdown-table-thead-tr-th">
+              <div class="qwen-markdown-table-thead-tr-th-col">
+                <span class="qwen-markdown-text">После</span>
+              </div>
+            </th>
+            <th scope="col" class="qwen-markdown-table-thead-tr-th">
+              <div class="qwen-markdown-table-thead-tr-th-col">
+                <span class="qwen-markdown-text">Изменение</span>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody class="qwen-markdown-table-tbody">
+          <tr class="qwen-markdown-table-tbody-tr">
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">reconstructor.py</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">602</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">0</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <strong class="qwen-markdown-strong"
+                  ><span class="qwen-markdown-text"
+                    >-602 (удалить)</span
+                  ></strong
+                >
+              </div>
+            </td>
+          </tr>
+          <tr class="qwen-markdown-table-tbody-tr">
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">ast_walker.py</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">116</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">~80</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">-36</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="qwen-markdown-table-tbody-tr">
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">node_type.py</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">116</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">~50</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">-66</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="qwen-markdown-table-tbody-tr">
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">placeholder.py</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">171</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">~120 (разделено)</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">-51</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="qwen-markdown-table-tbody-tr">
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">chunker.py</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">249</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">~200</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">-49</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="qwen-markdown-table-tbody-tr">
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">handlers/*</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">544</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">~400</span>
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <span class="qwen-markdown-text">-144</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="qwen-markdown-table-tbody-tr">
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <strong class="qwen-markdown-strong"
+                  ><span class="qwen-markdown-text">Итого</span></strong
+                >
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <strong class="qwen-markdown-strong"
+                  ><span class="qwen-markdown-text">~2000</span></strong
+                >
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <strong class="qwen-markdown-strong"
+                  ><span class="qwen-markdown-text">~1300</span></strong
+                >
+              </div>
+            </td>
+            <td class="qwen-markdown-table-tbody-tr-td">
+              <div class="qwen-markdown-table-tbody-tr-td-col">
+                <strong class="qwen-markdown-strong"
+                  ><span class="qwen-markdown-text">-35% кода</span></strong
+                >
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="qwen-markdown-hr"><hr /></div>
+  <div class="qwen-markdown-space"></div>
+  <h2 class="qwen-markdown-heading">
+    <span class="qwen-markdown-text">Рекомендации по порядку выполнения</span>
+  </h2>
+  <ol class="qwen-markdown-list" start="1" dir="auto">
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text">Сначала тесты</span></strong
+      ><span class="qwen-markdown-text"> — убедиться, что все тесты в </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >tests/markdown2/</code
+      ><span class="qwen-markdown-text"> проходят</span>
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text">Фаза 1</span></strong
+      ><span class="qwen-markdown-text"> — удалить </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >reconstructor.py</code
+      ><span class="qwen-markdown-text"> (самое простое и безопасное)</span>
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text">Фаза 3</span></strong
+      ><span class="qwen-markdown-text"> — упростить </span
+      ><code class="qwen-markdown-codespan" style="cursor: auto"
+        >node_type.py</code
+      ><span class="qwen-markdown-text"> (минимальный риск)</span>
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text">Фаза 7</span></strong
+      ><span class="qwen-markdown-text">
+        — переименовать файлы согласно новой структуре</span
+      >
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text">Фаза 2</span></strong
+      ><span class="qwen-markdown-text">
+        — рефакторинг handlers (требует тщательного тестирования)</span
+      >
+    </li>
+    <li>
+      <strong class="qwen-markdown-strong"
+        ><span class="qwen-markdown-text">Фазы 4-6</span></strong
+      ><span class="qwen-markdown-text"> — опциональные улучшения</span>
+    </li>
+  </ol>
+  <div class="qwen-markdown-space"></div>
+</div>
