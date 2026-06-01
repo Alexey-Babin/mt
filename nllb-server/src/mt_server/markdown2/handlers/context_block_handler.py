@@ -108,7 +108,10 @@ class ContextBlockHandler:
         parent_id: Optional[str],
         index: int,
     ):
-        """Создаёт контекстный блок и пушит его в стек."""
+        """Создаёт контекстный блок и пушит его в стек.
+
+        Возвращает True если обработка завершена успешно.
+        """
         node_id = self._walker._generate_node_id()
         clean_type = node.type.replace("_open", "")
 
@@ -160,7 +163,8 @@ class ContextBlockHandler:
         )
 
         # Для базовых типов блоков (без суффиксов) сразу создаём закрывающий маркер
-        if not node.type.endswith("_open"):
+        # ИСКЛЮЧЕНИЕ: dt и dd не закрываем сразу, т.к. они могут содержать paragraph
+        if not node.type.endswith("_open") and clean_type not in ("dt", "dd"):
             close_node_id = self._walker._generate_node_id()
             close_unit = UnitFactory.create_close_marker(
                 node_id=close_node_id,
@@ -173,6 +177,7 @@ class ContextBlockHandler:
             )
             self._walker.units.append(close_unit)
             self._context_stack.pop()
+        return True
 
     def _handle_close(self, node: SyntaxTreeNode, parent_id: Optional[str], index: int):
         """Создаёт закрывающий маркер контекстного блока."""

@@ -113,6 +113,11 @@ class MarkdownReconstructor:
             self._code_block_handler.handle_hr()
             return
 
+        # --- ОБРАБОТКА ЗАКРЫВАЮЩИХ МАРКЕРОВ ---
+        if is_close:
+            self._handle_structural_close(base_type)
+            return
+
         # --- СТАНДАРТНАЯ СТРУКТУРНАЯ ЛОГИКА ДЛЯ ПАРНЫХ КОНТЕЙНЕРОВ ---
         # Особая обработка для blockquote без суффиксов
         if base_type == "blockquote" and not is_open and not is_close:
@@ -170,6 +175,9 @@ class MarkdownReconstructor:
 
     def _handle_structural_open(self, base_type: str, unit: TranslationUnit):
         """Обрабатывает открытие структурного блока."""
+        # Если новый блок имеет level=0 (корневой уровень), закрываем все открытые списки
+        if unit.level == 0 and base_type in ("dl", "bullet_list", "ordered_list"):
+            self._close_all_lists()
         block_data = self._state_machine.handle_structural_open(base_type, unit)
         if block_data:
             self._state_machine.push_block(
@@ -177,6 +185,15 @@ class MarkdownReconstructor:
                 marker=block_data["marker"],
                 is_first_paragraph=block_data.get("is_first_paragraph", False),
             )
+
+    def _close_all_lists(self):
+        """Закрывает все открытые блоки списков до достижения корневого уровня."""
+        while self._state_machine.stack_size > 0:
+            top = self._state_machine.block_stack[-1]
+            if top["type"] in ("bullet_list", "ordered_list", "list_item"):
+                self._state_machine.pop_block(top["type"])
+            else:
+                break
 
     def _handle_structural_close(self, base_type: str):
         """Обрабатывает закрытие структурного блока."""

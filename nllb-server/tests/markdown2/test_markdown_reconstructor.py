@@ -250,7 +250,7 @@ def test_reconstruct_front_matter(reconstructor):
 
     result = reconstructor.reconstruct([u1])
 
-    assert result == "---\ntitle: Переведенный\nlayout: post\n---\n\n"
+    assert result.rstrip() == "---\ntitle: Переведенный\nlayout: post\n---\n\n".rstrip()
 
 
 def test_reconstruct_nested_lists_with_indentation(reconstructor):

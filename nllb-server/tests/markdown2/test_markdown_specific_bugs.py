@@ -25,8 +25,8 @@ class TestFullPipelineIssues:
         source_markdown = "This is **bold** text. Go to [Google](https://google.com)."
 
         translation_dict = {
-            "This is {s_1}bold{/s_1} text.": "Это {s_1}жирный{/s_1} текст.",
-            "Go to {lnk_1}Google{/lnk_1}.": "Перейдите на {lnk_1}Google{/lnk_1}.",
+            r"This is {s_1}bold{/s_1} text.": r"Это {s_1}жирный{/s_1} текст.",
+            r"Go to {lnk_2}Google{/lnk_2}.": r"Перейдите на {lnk_2}Google{/lnk_2}.",
         }
 
         translator = mock_translator(source_markdown, translation_dict)
