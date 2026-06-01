@@ -1,43 +1,43 @@
 import logging
-import re
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from markdown_it.tree import SyntaxTreeNode
 
 from mt_server.config import settings
 
-from .node_type import get_unit_type
-from .placeholder import PlaceholderManager
+from .handlers import (
+    ContextBlockHandler,
+    InlineCollector,
+    SpecialCaseHandler,
+    StructuralBlockHandler,
+)
 from .translation_unit import TranslationUnit
 from .translation_unit_type import TranslationUnitType
+from .unit_factory import UnitFactory
 
 logger = logging.getLogger("uvicorn.error")
 
 
-def _extract_heading_level(node: SyntaxTreeNode) -> int:
-    """Извлекает уровень заголовка из тега (например, 'h2' -> 2).
-
-    markdown-it-py не устанавливает node.level для заголовков,
-    поэтому извлекаем уровень из тега (tag='h1', 'h2', ...).
-    """
-    HEADING_TAG_PATTERN = re.compile(r"^h([1-6])$")
-    tag = node.tag or ""
-    match = HEADING_TAG_PATTERN.match(tag)
-    if match:
-        return int(match.group(1))
-    return 1  # fallback на h1 по умолчанию
-
-
 class ASTWalker:
-    """Обходит дерево AST Markdown методом DFS, сохраняя полную структуру вложенности."""
+    """Обходит дерево AST Markdown методом DFS, сохраняя полную структуру вложенности.
+
+    Использует архитектуру handlers для делегирования обработки различных типов узлов:
+    - ContextBlockHandler: абзацы, заголовки, ячейки таблиц
+    - StructuralBlockHandler: списки, цитаты, блоки кода
+    - SpecialCaseHandler: Front Matter и другие исключения
+    - InlineCollector: сбор текста и плейсхолдеров внутри контекстов
+    """
 
     def __init__(self):
         self.units: List[TranslationUnit] = []
         self._node_counter: int = 0
 
-        # Стековая архитектура для поддержки вложенных контекстов перевода.
-        # Хранит кортежи: (Активный TranslationUnit, Локальный PlaceholderManager)
-        self._context_stack: List[Tuple[TranslationUnit, PlaceholderManager]] = []
+        # Handlers для различных типов узлов
+        self._context_block_handler: ContextBlockHandler = None  # type: ignore[assignment]
+        self._structural_handler: StructuralBlockHandler = None  # type: ignore[assignment]
+        self._special_case_handler: SpecialCaseHandler = None  # type: ignore[assignment]
+        self._inline_collector: InlineCollector = None  # type: ignore[assignment]
+        self._unit_factory: UnitFactory = UnitFactory()
 
     def _generate_node_id(self) -> str:
         """Генерирует уникальный внутренний ID для создаваемых юнитов."""
@@ -51,7 +51,12 @@ class ASTWalker:
         """Точка входа. Обходит дерево и возвращает плоский список юнитов."""
         self.units = []
         self._node_counter = 0
-        self._context_stack = []
+
+        # Инициализируем handlers для каждого прохода
+        self._context_block_handler = ContextBlockHandler(self)
+        self._structural_handler = StructuralBlockHandler(self)
+        self._special_case_handler = SpecialCaseHandler(self)
+        self._inline_collector = InlineCollector(self)
 
         logger.debug("Starting AST walk: root type=%s", root.type)
 
@@ -76,8 +81,14 @@ class ASTWalker:
     def _traverse(
         self, node: SyntaxTreeNode, parent_id: Optional[str] = None, index: int = 0
     ):
-        """Рекурсивный метод обхода дерева в глубину (DFS)."""
+        """Рекурсивный метод обхода дерева в глубину (DFS).
 
+        Делегирует обработку узлов соответствующим handlers:
+        1. Корневые узлы (root/document) - обрабатываются напрямую
+        2. Контекстные блоки - ContextBlockHandler
+        3. Структурные блоки - StructuralBlockHandler
+        4. Специальные случаи - SpecialCaseHandler
+        """
         # Сначала проверяем тип строки на "root" или "document" БЕЗ вызова get_unit_type,
         # так как у корневого узла 'root' нельзя безопасно читать свойства токенов.
         if node.type in ("root", "document"):
@@ -85,388 +96,21 @@ class ASTWalker:
                 self._traverse(child, parent_id=parent_id, index=idx)
             return
 
-        unit_type = get_unit_type(node.type)
+        # Пробуем обработать через handlers по приоритету
+        # 1. Контекстные блоки (абзацы, заголовки) - имеют наивысший приоритет
+        if self._context_block_handler.handle_node(node, parent_id, index):
+            return
 
-        # --- РЕЖИМ НАКОПЛЕНИЯ ТЕКСТА (Если стек контекстов не пуст) ---
-        if self._context_stack:
-            # Направляем в инлайн-коллектор абсолютно всё,
-            # КРОМЕ открытия новых контекстных блоков (например, вложенного heading_open)
-            if not (
-                unit_type == TranslationUnitType.CONTEXT_BLOCK
-                and node.type.endswith("_open")
-            ):
-                self._collect_inline(node, parent_id, index)
-                return
+        # 2. Структурные блоки (списки, цитаты, код)
+        if self._structural_handler.handle_node(node, parent_id, index):
+            return
 
-        # --- РЕЖИМ ОБХОДА СТРУКТУРЫ И НАЧАЛА КОНТЕКСТОВ ---
-        # Проверяем, является ли узел CONTEXT_BLOCK без суффиксов (например, "paragraph")
-        if (
-            unit_type == TranslationUnitType.CONTEXT_BLOCK
-            and not node.type.endswith("_open")
-            and not node.type.endswith("_close")
-        ):
-            # Это базовый тип блока (например, "paragraph" от SyntaxTreeNode),
-            # обрабатываем его как открывающий тег
-            self._handle_context_block_open(node, parent_id, index)
-        elif unit_type == TranslationUnitType.CONTEXT_BLOCK and node.type.endswith(
-            "_open"
-        ):
-            self._handle_context_block_open(node, parent_id, index)
-
-        elif unit_type == TranslationUnitType.CONTEXT_BLOCK and node.type.endswith(
-            "_close"
-        ):
-            # Для парных тегов: создаём закрывающий маркер и удаляем контекст из стека
-            close_node_id = self._generate_node_id()
-            clean_type = node.type.replace("_close", "")
-
-            logger.debug(
-                "Context block close: type=%s, node_id=%s",
-                clean_type,
-                close_node_id,
-            )
-
-            close_unit = TranslationUnit(
-                node_id=close_node_id,
-                node_type=node.type,
-                unit_type=TranslationUnitType.CONTEXT_BLOCK,
-                original_text="",
-                extracted_text="",
-                need_translation=False,
-                parent_id=parent_id,
-                index_in_parent=index,
-                level=node.level,
-                tag=node.tag,
-            )
-            self.units.append(close_unit)
-
-            # Удаляем контекст из стека
-            if self._context_stack:
-                self._context_stack.pop()
-
-        elif unit_type == TranslationUnitType.STRUCTURAL_IGNORE:
-            # Особая обработка для inline-контейнера: спускаемся внутрь,
-            # чтобы обработать дочерние инлайн-элементы (code_inline, strong, em...)
-            if node.type == "inline":
-                for idx, child in enumerate(node.children or []):
-                    self._collect_inline(child, parent_id, idx)
-                return
-
-            self._handle_structural_block(node, parent_id, index)
-
-        elif unit_type == TranslationUnitType.SPECIAL_CASE:
-            self._handle_special_case(node, parent_id, index)
-
-    def _handle_context_block_open(
-        self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
-    ) -> bool:
-        """Сценарий А (Начало): Инициализирует контейнер и пушит его в стек контекстов.
-
-        Returns:
-            True если это был базовый тип блока (без суффиксов), False если парный тег (_open)
-        """
-        node_id = self._generate_node_id()
-        clean_type = node.type.replace("_open", "")
-        logger.debug(
-            "Context block open: type=%s, node_id=%s, level=%d",
-            clean_type,
-            node_id,
-            node.level,
-        )
-
-        context_unit = TranslationUnit(
-            node_id=node_id,
-            node_type=clean_type,
-            unit_type=TranslationUnitType.CONTEXT_BLOCK,
-            original_text="",
-            extracted_text="",
-            need_translation=True,
-            parent_id=parent_id,
-            index_in_parent=index,
-            level=(
-                _extract_heading_level(node) if clean_type == "heading" else node.level
-            ),
-            tag=node.tag,
-            attrs=dict(node.attrs) if node.attrs else {},
-        )
-        manager = PlaceholderManager()
-
-        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Добавляем юнит в список СРАЗУ, сохраняя DFS порядок
-        self.units.append(context_unit)
-        self._context_stack.append((context_unit, manager))
-
-        # Рекурсивно спускаемся к детям
-        for idx, child in enumerate(node.children):
-            self._traverse(child, parent_id=node_id, index=idx)
-
-        # Фиксируем плейсхолдеры после обработки всех дочерних элементов
-        context_unit.placeholders = list(manager.registry.values())
-        logger.debug(
-            "Context block complete: type=%s, node_id=%s, placeholders_count=%d",
-            clean_type,
-            node_id,
-            len(context_unit.placeholders),
-        )
-
-        # Для базовых типов блоков (без суффиксов) сразу создаём закрывающий маркер
-        # и удаляем контекст из стека
-        if not node.type.endswith("_open"):
-            close_node_id = self._generate_node_id()
-            close_unit = TranslationUnit(
-                node_id=close_node_id,
-                node_type=f"{clean_type}_close",
-                unit_type=TranslationUnitType.CONTEXT_BLOCK,
-                original_text="",
-                extracted_text="",
-                need_translation=False,
-                parent_id=parent_id,
-                index_in_parent=index,
-                level=node.level,
-                tag=node.tag,
-            )
-            self.units.append(close_unit)
-            self._context_stack.pop()
-            return True
-
-        # Для парных тегов (_open) оставляем контекст в стеке,
-        # закрывающий маркер будет создан при обработке явного _close узла
-        return False
+        # 3. Специальные случаи (Front Matter)
+        if self._special_case_handler.handle_node(node, parent_id, index):
+            return
 
     def _collect_inline(
         self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
     ):
-        """Управляет накоплением контента и плейсхолдеров внутри верхнего контекста стека."""
-        current_unit, current_manager = self._context_stack[-1]
-        unit_type = get_unit_type(node.type)
-
-        # Сценарий А (Конец): Наткнулись на закрывающий тег контекстного блока
-        if unit_type == TranslationUnitType.CONTEXT_BLOCK and node.type.endswith(
-            "_close"
-        ):
-            logger.debug(
-                "Context block close: type=%s, node_id=%s, text_length=%d",
-                current_unit.node_type,
-                current_unit.node_id,
-                len(current_unit.extracted_text),
-            )
-
-            # Фиксируем все собранные плейсхолдеры из реестра менеджера (сам unit уже лежит в self.units)
-            current_unit.placeholders = list(current_manager.registry.values())
-
-            # Добавляем закрывающий пустой маркер-маяк для сохранения иерархии
-            node_id = self._generate_node_id()
-            close_unit = TranslationUnit(
-                node_id=node_id,
-                node_type=node.type,
-                unit_type=unit_type,
-                original_text="",
-                extracted_text="",
-                need_translation=False,
-                parent_id=parent_id,
-                index_in_parent=index,
-                level=node.level,
-                tag=node.tag,
-            )
-            self.units.append(close_unit)
-
-            # Удаляем закрытый контекст из стека
-            self._context_stack.pop()
-            return
-
-        # Сценарий Б: Обработка базового текстового узла
-        if node.type == "text":
-            current_unit.original_text += node.content
-            current_unit.extracted_text += node.content
-            return
-
-        # Сценарий Б и В: Обработка инлайн-элементов (strong, em, link, code_inline, image...)
-        if unit_type in (
-            TranslationUnitType.INLINE_TRANSLATE,
-            TranslationUnitType.INLINE_PROTECT,
-        ):
-            # Пропускаем явные _close теги для парных инлайнов (strong_close, em_close...)
-            # Закрывающий placeholder уже был создан искусственно после обработки детей _open тега
-            if (
-                node.type.endswith("_close")
-                and unit_type == TranslationUnitType.INLINE_TRANSLATE
-            ):
-                return
-
-            ph = current_manager.create_placeholder(node)
-
-            logger.debug(
-                "Inline element: type=%s, mask=%s, strategy=%s",
-                node.type,
-                ph.tag_mask.strip(),
-                ph.strategy,
-            )
-
-            # Очищаем маску от внешних служебных пробелов (.strip()), делая её вида {s_1}
-            clean_mask = ph.tag_mask.strip()
-            current_unit.extracted_text += clean_mask
-
-            if isinstance(ph.original_markup, str):
-                current_unit.original_text += ph.original_markup
-
-            # Рекурсивно сканируем детей инлайна
-            for idx, child in enumerate(node.children):
-                self._collect_inline(child, parent_id, idx)
-
-            # Для парных тегов с стратегией INLINE_TRANSLATE нужно также создать закрывающий placeholder
-            # markdown-it-py объединяет strong_open/strong_close в один узел strong,
-            # но нам нужны оба placeholder для корректного восстановления
-            # Создаём закрывающий placeholder ПОСЛЕ обработки детей, чтобы текст оказался между масками
-            if ph.strategy == "INLINE_TRANSLATE" and not ph.is_closing:
-                # Создаём закрывающий placeholder с тем же ID
-                close_ph = current_manager._create_closing_placeholder(
-                    ph, prefix=current_manager._get_short_prefix(node.type)
-                )
-                close_clean_mask = close_ph.tag_mask.strip()
-                current_unit.extracted_text += close_clean_mask
-                logger.debug(
-                    "Added closing placeholder for paired inline: mask=%s",
-                    close_clean_mask,
-                )
-            return
-
-        # В самом конце метода _collect_inline для любых других узлов,
-        # которые не подошли под условия выше, но оказались внутри абзаца:
-        if node.type == "inline":
-            for idx, child in enumerate(node.children):
-                self._collect_inline(child, parent_id, idx)
-            return
-
-    def _handle_structural_block(
-        self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
-    ):
-        """Сценарий Г: Обрабатывает каркас документа (blockquote, list_item), сохраняя маркеры вложенности."""
-
-        # Проверяем, является ли узел базовым типом без суффиксов (например, "list_item")
-        is_base_type = not node.type.endswith("_open") and not node.type.endswith(
-            "_close"
-        )
-
-        # Для базовых типов (list_item, blockquote без суффиксов) обрабатываем как открывающий тег
-        if is_base_type:
-            self._handle_structural_block_open(node, parent_id, index)
-            return
-
-        # Обработка явных _close тегов
-        if node.type.endswith("_close"):
-            self._handle_structural_block_close(node, parent_id, index)
-            return
-
-        # Обработка явных _open тегов
-        if node.type.endswith("_open"):
-            self._handle_structural_block_open(node, parent_id, index)
-            return
-
-    def _handle_structural_block_open(
-        self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
-    ):
-        """Создаёт открывающий маркер структурного блока и рекурсивно обрабатывает детей."""
-        node_id = self._generate_node_id()
-
-        node_info = getattr(node, "markup", None) or node.content or ""
-
-        # У токенов fence в markdown-it-py язык кода (например, info = "python") лежит в поле node.info
-        # Вытаскиваем его, чтобы reconstructor знал язык подсветки синтаксиса
-        lang_info = getattr(node, "info", "") or None
-
-        logger.debug(
-            "Structural block open: type=%s, node_id=%s, level=%d",
-            node.type,
-            node_id,
-            node.level,
-        )
-
-        unit = TranslationUnit(
-            node_id=node_id,
-            node_type=node.type,
-            unit_type=TranslationUnitType.STRUCTURAL_IGNORE,
-            original_text=node.content or "",
-            extracted_text=node.content or "",
-            need_translation=False,
-            parent_id=parent_id,
-            index_in_parent=index,
-            level=node.level,
-            tag=node.tag,
-            attrs=dict(node.attrs) if node.attrs else {},
-            info=str(lang_info)
-            if lang_info
-            else (str(node_info) if node_info in ("-", "*", "+") else None),
-        )
-        self.units.append(unit)
-
-        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Если это одиночный блок кода/математики/HTML,
-        # мы полностью БЛОКИРУЕМ рекурсивный спуск в его детей, предотвращая дублирование в списке units
-        if node.type in ("fence", "code_block", "math_block", "html_block"):
-            # Для одиночных блоков сразу создаём закрывающий маркер
-            close_node_id = self._generate_node_id()
-            close_unit = TranslationUnit(
-                node_id=close_node_id,
-                node_type=node.type,
-                unit_type=TranslationUnitType.STRUCTURAL_IGNORE,
-                original_text="",
-                extracted_text="",
-                need_translation=False,
-                parent_id=parent_id,
-                index_in_parent=index,
-                level=node.level,
-                tag=node.tag,
-            )
-            self.units.append(close_unit)
-            return
-
-        # Для всех остальных парных структурных блоков (цитаты, списки) спускаемся к детям
-        # Закрывающий маркер будет создан при обработке явного _close узла
-        if node.children:
-            for idx, child in enumerate(node.children):
-                self._traverse(child, parent_id=node_id, index=idx)
-
-    def _handle_structural_block_close(
-        self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
-    ):
-        """Создаёт закрывающий маркер структурного блока."""
-        node_id = self._generate_node_id()
-
-        logger.debug(
-            "Structural block close: type=%s, node_id=%s",
-            node.type,
-            node_id,
-        )
-
-        unit = TranslationUnit(
-            node_id=node_id,
-            node_type=node.type,
-            unit_type=TranslationUnitType.STRUCTURAL_IGNORE,
-            original_text="",
-            extracted_text="",
-            need_translation=False,
-            parent_id=parent_id,
-            index_in_parent=index,
-            level=node.level,
-            tag=node.tag,
-        )
-        self.units.append(unit)
-
-    def _handle_special_case(
-        self, node: SyntaxTreeNode, parent_id: Optional[str], index: int
-    ):
-        """Сценарий Д: Обрабатывает Front Matter метаданные."""
-        node_id = self._generate_node_id()
-
-        logger.debug("Special case: type=%s, node_id=%s", node.type, node_id)
-
-        special_unit = TranslationUnit(
-            node_id=node_id,
-            node_type=node.type,
-            unit_type=TranslationUnitType.SPECIAL_CASE,
-            original_text=node.content or "",
-            extracted_text=node.content or "",
-            need_translation=False,
-            parent_id=parent_id,
-            index_in_parent=index,
-            level=node.level,
-        )
-        self.units.append(special_unit)
+        """Делегирует сбор инлайн-элементов в InlineCollector."""
+        self._inline_collector.collect(node, parent_id, index)
