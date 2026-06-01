@@ -82,6 +82,7 @@ class PlaceholderManager:
             tag_mask = f" {{{prefix}_{current_id}}} "
 
             # Запоминаем ID в стек только для открывающих тегов транслируемой разметки
+            # НЕ добавляем в стек, если это искусственно созданный закрывающий плейсхолдер
             if strategy == "INLINE_TRANSLATE":
                 if prefix not in self._open_tags_stacks:
                     self._open_tags_stacks[prefix] = []
@@ -101,7 +102,7 @@ class PlaceholderManager:
                 original_markup = node.content or ""
 
         elif strategy == "INLINE_TRANSLATE":
-            if node.type.startswith("link_"):
+            if node.type == "link" or node.type.startswith("link_"):
                 if is_closing:
                     original_markup = ""
                 else:
@@ -135,6 +136,35 @@ class PlaceholderManager:
             node_type=node.type,
             original_markup=original_markup,
             is_closing=is_closing,
+        )
+
+        self.registry[tag_mask.strip()] = placeholder
+        return placeholder
+
+    def _create_closing_placeholder(
+        self, open_ph: Placeholder, prefix: str
+    ) -> Placeholder:
+        """Создаёт закрывающий placeholder для парного тега с тем же ID.
+
+        Используется когда markdown-it-py объединяет strong_open/strong_close
+        в один узел strong, но нам нужны оба placeholder для корректного восстановления.
+        """
+        current_id = open_ph.id
+        tag_mask = f" {{/{prefix}_{current_id}}} "
+
+        # Закрывающий тег не содержит оригинальной разметки, НО для ссылок (link)
+        # нужно сохранить original_markup из открывающего тега для восстановления URL
+        original_markup = open_ph.original_markup if prefix == "lnk" else ""
+
+        # Сборка объекта - используем тот же node_type что и у открывающего тега
+        # (для сильных это 'strong', для ссылок это 'link_open')
+        placeholder = Placeholder(
+            id=current_id,
+            tag_mask=tag_mask,
+            strategy=open_ph.strategy,
+            node_type=open_ph.node_type,  # Сохраняем оригинальный node_type
+            original_markup=original_markup,
+            is_closing=True,
         )
 
         self.registry[tag_mask.strip()] = placeholder

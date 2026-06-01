@@ -284,6 +284,14 @@ class ASTWalker:
             TranslationUnitType.INLINE_TRANSLATE,
             TranslationUnitType.INLINE_PROTECT,
         ):
+            # Пропускаем явные _close теги для парных инлайнов (strong_close, em_close...)
+            # Закрывающий placeholder уже был создан искусственно после обработки детей _open тега
+            if (
+                node.type.endswith("_close")
+                and unit_type == TranslationUnitType.INLINE_TRANSLATE
+            ):
+                return
+
             ph = current_manager.create_placeholder(node)
 
             logger.debug(
@@ -303,6 +311,22 @@ class ASTWalker:
             # Рекурсивно сканируем детей инлайна
             for idx, child in enumerate(node.children):
                 self._collect_inline(child, parent_id, idx)
+
+            # Для парных тегов с стратегией INLINE_TRANSLATE нужно также создать закрывающий placeholder
+            # markdown-it-py объединяет strong_open/strong_close в один узел strong,
+            # но нам нужны оба placeholder для корректного восстановления
+            # Создаём закрывающий placeholder ПОСЛЕ обработки детей, чтобы текст оказался между масками
+            if ph.strategy == "INLINE_TRANSLATE" and not ph.is_closing:
+                # Создаём закрывающий placeholder с тем же ID
+                close_ph = current_manager._create_closing_placeholder(
+                    ph, prefix=current_manager._get_short_prefix(node.type)
+                )
+                close_clean_mask = close_ph.tag_mask.strip()
+                current_unit.extracted_text += close_clean_mask
+                logger.debug(
+                    "Added closing placeholder for paired inline: mask=%s",
+                    close_clean_mask,
+                )
             return
 
         # В самом конце метода _collect_inline для любых других узлов,

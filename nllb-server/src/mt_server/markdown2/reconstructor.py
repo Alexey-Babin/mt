@@ -363,18 +363,27 @@ class MarkdownReconstructor:
         # Строим быстрые карты доступа к плейсхолдерам по их числовым ID и типам
         open_ph_map = {}
         atomic_ph_map = {}
+        # Префиксы для парных транслируемых тегов (не имеют _open/_close суффиксов)
+        paired_translate_prefixes = {"s", "e", "del", "lnk"}
         for ph in unit.placeholders:
             clean_mask = ph.tag_mask.strip()
-            if ph.is_closing:
-                continue
 
             # Извлекаем числовой ID из маски (например, из "{lnk_1}" вытаскиваем 1)
             if match := re.search(r"\d+", clean_mask):
                 ph_id = int(match.group())
                 prefix = clean_mask[1:-1].split("_")[0]
-                if ph.node_type.endswith("_open"):
+                if ph.is_closing:
+                    # Закрывающие плейсхолдеры не добавляем в карты для поиска открывающих
+                    continue
+
+                # Для парных тегов без суффиксов (strong, link, em, s)
+                # Проверяем по префиксу и тому, что это не закрывающий тег
+                if prefix in paired_translate_prefixes:
                     open_ph_map[(prefix, ph_id)] = ph
-                else:
+                # Для атомарных тегов (code_inline, math_inline, etc.)
+                elif ph.node_type.endswith("_open") or not any(
+                    ph.node_type.endswith(suffix) for suffix in ["_open", "_close"]
+                ):
                     atomic_ph_map[clean_mask] = ph
 
         logger.debug(

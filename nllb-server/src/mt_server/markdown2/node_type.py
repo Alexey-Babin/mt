@@ -68,6 +68,7 @@ for block in _BLOCK_TYPES:
 for inline in _INLINE_TRANSLATE_PAIRED:
     _NODE_TYPE_MAP[f"{inline}_open"] = TranslationUnitType.INLINE_TRANSLATE
     _NODE_TYPE_MAP[f"{inline}_close"] = TranslationUnitType.INLINE_TRANSLATE
+    _NODE_TYPE_MAP[inline] = TranslationUnitType.INLINE_TRANSLATE
 
 # Заполняем защищаемые атомарные инлайны (одиночные токены)
 for inline in _INLINE_PROTECT_TYPES:
