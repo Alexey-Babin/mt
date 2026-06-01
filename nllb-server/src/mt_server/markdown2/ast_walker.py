@@ -420,8 +420,9 @@ class ASTWalker:
 
         # Для всех остальных парных структурных блоков (цитаты, списки) спускаемся к детям
         # Закрывающий маркер будет создан при обработке явного _close узла
-        for idx, child in enumerate(node.children):
-            self._traverse(child, parent_id=node_id, index=idx)
+        if node.children:
+            for idx, child in enumerate(node.children):
+                self._traverse(child, parent_id=node_id, index=idx)
 
     def _handle_structural_block_close(
         self, node: SyntaxTreeNode, parent_id: Optional[str], index: int

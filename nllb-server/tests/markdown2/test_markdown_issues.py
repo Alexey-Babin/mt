@@ -75,7 +75,7 @@ def mock_translator():
                 text=text,
                 src_lang="eng_Latn",
                 tgt_lang="rus_Cyrl",
-                engine=engine,
+                engine=engine,  # type: ignore
             )
 
     return _create_translator

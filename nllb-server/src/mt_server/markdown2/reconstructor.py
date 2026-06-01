@@ -133,6 +133,57 @@ class MarkdownReconstructor:
             is_close,
         )
 
+        # === ТАБЛИЦЫ: специальная обработка ===
+        if base_type in ("table", "thead"):
+            # Для таблиц мы не используем стек, а просто пропускаем эти узлы
+            # Разделители | добавляются при обработке th/td ячеек
+            return
+
+        if base_type == "tbody":
+            # Обработка tbody: генерируем разделительную строку и переносы строк для строк таблицы
+            if not is_close:
+                # При открытии tbody добавляем разделительную строку после заголовков
+                buffer_str = "".join(self._buffer)
+                if "|" in buffer_str:
+                    # Находим последнюю строку с | (заголовок таблицы)
+                    lines = buffer_str.split("\n")
+                    last_pipe_line = ""
+                    for line in reversed(lines):
+                        if "|" in line and line.strip():
+                            last_pipe_line = line
+                            break
+                    if last_pipe_line:
+                        col_count = last_pipe_line.count("|") - 1  # Количество столбцов
+                        if col_count > 0:
+                            # Добавляем перенос строки перед разделителем, если его нет
+                            if not self._buffer[-1].endswith("\n"):
+                                self._buffer.append("\n")
+                            separator = "|" + "|".join(["------"] * col_count) + "|\n"
+                            self._buffer.append(separator)
+                            logger.debug("Added table separator: %s", separator.strip())
+            return
+
+        if base_type == "tr":
+            # Обработка строк таблицы: добавляем перенос строки перед началом строки и после закрытия строки
+            if not is_close:
+                # Перед началом строки таблицы добавляем перенос строки, если это не первая строка
+                buffer_str = "".join(self._buffer)
+                if (
+                    buffer_str
+                    and "|" in buffer_str
+                    and not self._buffer[-1].endswith("\n")
+                ):
+                    self._buffer.append("\n")
+            elif is_close:
+                # После закрытия строки таблицы убеждаемся, что есть перенос строки
+                if self._buffer and not self._buffer[-1].endswith("\n"):
+                    self._buffer.append("\n")
+            return
+
+        if base_type in ("th", "td"):
+            # Обработка ячеек таблицы: | добавляются в _handle_context_block
+            return
+
         # Хронологический перехват блоков кода (fence, code_block) и разделителей (hr)
         # Обрабатываем их строго ОДИН раз (при открытии или если это одиночный токен hr)
         if base_type in ("fence", "code_block"):
@@ -271,6 +322,43 @@ class MarkdownReconstructor:
         is_close = unit.node_type.endswith("_close")
         base_type = unit.node_type.replace("_open", "").replace("_close", "")
 
+        # === ТАБЛИЦЫ: специальная обработка ячеек th/td ===
+        if base_type in ("th", "td"):
+            if is_close:
+                # Для закрывающих тегов ячеек: добавляем завершающий |
+                self._buffer.append("|")
+                return
+
+            # Для открывающих тегов: ничего не делаем, содержимое будет обработано ниже
+            # | перед содержимым не нужен, так как мы добавляем | после предыдущей ячейки
+
+        # === ТАБЛИЦЫ: генерация разделительной строки при переходе от thead к tbody ===
+        if base_type == "tbody" and not is_close:
+            # Проверяем, есть ли в буфере уже содержимое таблицы (заголовки)
+            # Если да, то нужно добавить разделительную строку
+            buffer_str = "".join(self._buffer)
+            if "|" in buffer_str and not self._block_stack:
+                # Подсчитываем количество столбцов по последней строке с |
+                last_pipe_line = ""
+                for line in buffer_str.split("\n"):
+                    if "|" in line:
+                        last_pipe_line = line
+                if last_pipe_line:
+                    col_count = last_pipe_line.count("|") - 1  # Количество столбцов
+                    if col_count > 0:
+                        separator = "|" + "|".join(["------"] * col_count) + "|\n"
+                        self._buffer.append(separator)
+                        logger.debug("Added table separator: %s", separator.strip())
+            # Пушим флаг, что мы внутри tbody
+            self._block_stack.append({"type": "in_tbody", "is_first_row": True})
+            return
+
+        if base_type == "tbody" and is_close:
+            # Закрываем tbody
+            if self._block_stack and self._block_stack[-1]["type"] == "in_tbody":
+                self._block_stack.pop()
+            return
+
         if is_close:
             logger.debug("Context block close: type=%s", base_type)
             # Снимаем контекстный блок dt/dd со стека
@@ -331,7 +419,11 @@ class MarkdownReconstructor:
         else:
             block_content = restored_markdown
 
-        self._write_with_prefix(block_content)
+        # Для ячеек таблицы не используем префиксы
+        if base_type in ("th", "td"):
+            self._buffer.append(block_content)
+        else:
+            self._write_with_prefix(block_content)
 
     def _restore_inline_placeholders(self, text: str, unit: TranslationUnit) -> str:
         """Разворачивает маски плейсхолдеров обратно в Markdown разметку.
