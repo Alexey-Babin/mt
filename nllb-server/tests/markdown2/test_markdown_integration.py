@@ -7,7 +7,10 @@ from src.mt_server.markdown2.markdown_translator import MarkdownTranslator
 
 
 class MockTranslationEngine:
-    """Mock-движок перевода, полностью имитирующий инференс модели NLLB."""
+    """Mock-движок перевода, полностью имитирующий инференс модели NLLB.
+
+    Содержит полный словарь переводов для всех сегментов интеграционного теста.
+    """
 
     def __init__(self):
         self.model_name = "mock-nllb-model"
@@ -19,24 +22,34 @@ class MockTranslationEngine:
         self.tokenizer = MagicMock()
         self._setup_tokenizer_mock()
 
-        # Набор предопределенных переводов сегментов (включая маски плейсхолдеров)
+        # Полный набор предопределенных переводов сегментов для интеграционного теста
+        # Включает все возможные сегменты с учётом плейсхолдеров
         self._translation_dict = {
+            # Заголовки и параграфы
             "Some text before.": "Некоторый текст перед.",
-            "This is {s_1}bold{/s_1} text.": "Это {s_1}жирный{/s_1} текст.",
-            "Go to {lnk_1}Google{/lnk_1}.": "Перейдите в {lnk_1}Google{/lnk_1}.",
+            # Параграф с inline элементами (плейсхолдеры будут подставлены walker'ом)
+            "This is {s_1}bold{/s_1} text. Go to {lnk_1}Google{/lnk_1}.": "Это {s_1}жирный{/s_1} текст. Перейдите на {lnk_1}Google{/lnk_1}.",
+            # Элементы списков
             "Item 1": "Элемент 1",
             "Nested Item 1.1": "Вложенный элемент 1.1",
+            # Списки определений
             "Term text": "Текст термина",
             "Definition text": "Текст определения",
-            "Some text after.": "Некоторый текст после.",
+            # Код в цитате - переводим только содержимое кода (строки внутри fence)
+            "def hello():": "def hello():  # функция приветствия",
+            "    print('world')": "    print('мир')  # печатает мир",
+            # Таблица - каждая ячейка отдельно
             "Name": "Имя",
             "Age": "Возраст",
             "John": "Джон",
             "30": "30",
             "Jane": "Джейн",
             "25": "25",
-            "{chk_1}Done task": "{chk_1}Выполнена",
-            "{chk_2}Pending task": "{chk_2}В ожидании",
+            # Task list с checkbox плейсхолдерами
+            "{chk_1}Done task": "{chk_1}Выполненная задача",
+            "{chk_2}Pending task": "{chk_2}Ожидающая задача",
+            # Финальный параграф
+            "Some text after.": "Некоторый текст после.",
         }
 
     def _setup_tokenizer_mock(self):
@@ -61,7 +74,8 @@ class MockTranslationEngine:
             if seg in self._translation_dict:
                 translated_segments.append(self._translation_dict[seg])
             else:
-                # Если сегмент не найден в словаре (или это служебный текст), возвращаем его как есть
+                # Если сегмент не найден в словаре, возвращаем его как есть
+                # Это позволяет обрабатывать служебные строки и код
                 translated_segments.append(seg)
 
         # Склеиваем переведенные сегменты обратно через "\\x1e"
@@ -78,7 +92,7 @@ def mock_translator():
 
     # С помощью patch переопределяем глобальную настройку max_input_tokens в процессе теста,
     # чтобы чанки резались предсказуемо независимо от файла config.py
-    with patch("src.mt_server.markdown2.markdown_translator.max_input_tokens", 20):
+    with patch("src.mt_server.markdown2.markdown_translator.max_input_tokens", 50):
         # Возвращаем фабрику для создания переводчика с конкретным текстом
         def _create_translator(text: str):
             return MarkdownTranslator(
@@ -95,10 +109,19 @@ def test_markdown_translator_full_pipeline(mock_translator):
     """Сквозной интеграционный тест полного цикла перевода сложного Markdown документа.
 
     Проверяет, что при переводе файла с определённой структурой (заголовки, списки,
-    таблицы, task lists, код, цитаты), она сохранилась. Сам перевод mock-овый.
+    таблицы, task lists, код в цитатах, списки определений), структура сохраняется,
+    а контент переводится. Используется mock-движок с полным словарём переводов.
+
+    Тест проверяет ПОЛНОЕ совпадение результата с ожидаемым Markdown.
+
+    NOTE: Этот тест может падать из-за известных проблем в реализации:
+    - Code in blockquote: неправильная обработка fence внутри цитат
+    - Definition lists: dt/dd элементы могут теряться или дублироваться
+    - Table cells: перевод ячеек таблицы может не работать
+    - Task list: checkbox элементы могут не переводиться
     """
 
-    # 1. Формируем "грязный" исходный Markdown-текст на английском со всеми edge-cases
+    # 1. Формируем исходный Markdown-текст на английском со всеми edge-cases
     source_markdown = (
         "---\n"
         "title: Document\n"
@@ -123,28 +146,29 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "Some text after."
     )
 
-    # 2. Ожидаемый результат после перевода (структура должна сохраниться)
+    # 2. Ожидаемый результат после перевода (структура сохранена, контент переведён)
+    # Это ТО, ЧТО ДОЛЖНО ПОЛУЧИТЬСЯ при корректной работе системы
     expected_markdown = (
         "---\n"
         "title: Document\n"
         "layout: post\n"
         "---\n\n"
         "## Некоторый текст перед.\n\n"
-        "Это **жирный** текст. Перейдите в [Google](https://google.com).\n\n"
+        "Это **жирный** текст. Перейдите на [Google](https://google.com).\n\n"
         "- Элемент 1\n"
         "    - Вложенный элемент 1.1\n\n"
         "Текст термина\n"
         ": Текст определения\n\n"
         "> ```python\n"
-        "def hello():\n"
-        "    print('world')\n"
-        "```\\n\\n"
+        "> def hello():  # функция приветствия\n"
+        ">     print('мир')  # печатает мир\n"
+        "> ```\n\n"
         "| Имя | Возраст |\n"
-        "|------|-----|\n"
-        "| Джон | 30  |\n"
-        "| Джейн | 25  |\n\n"
-        "- [x] Выполнена\n"
-        "- [ ] В ожидании\n\n"
+        "|------|------|\n"
+        "| Джон | 30 |\n"
+        "| Джейн | 25 |\n\n"
+        "- [x] Выполненная задача\n"
+        "- [ ] Ожидающая задача\n\n"
         "Некоторый текст после."
     )
 
@@ -152,32 +176,15 @@ def test_markdown_translator_full_pipeline(mock_translator):
     translator = mock_translator(source_markdown)
     result_markdown = translator.process()
 
-    # 4. Проверяем, что результат не пустой
-    assert result_markdown is not None
-    assert len(result_markdown) > 0
-
-    # Проверяем наличие ключевых структурных элементов
-    # Front matter должен сохраниться
-    assert "---" in result_markdown
-    assert "title: Document" in result_markdown
-
-    # Таблица должна сохраниться
-    assert "|" in result_markdown
-
-    # Task list должен сохраниться
-    assert "- [x]" in result_markdown or "- [ ]" in result_markdown
-
-    # Код должен сохраниться
-    assert "```" in result_markdown
-
-    # Списки должны сохраниться
-    assert "-" in result_markdown
-
-    # Текст должен быть переведён (проверка наличия русского текста)
-    assert "John" in result_markdown or "Джон" in result_markdown
-
-    # Полное соответствие переведённого ожидаемому
-    assert result_markdown == expected_markdown
+    # 4. Проверяем ПОЛНОЕ совпадение с ожидаемым результатом
+    # Тест будет падать, пока не исправлены баги в reconstructor.py и ast_walker.py
+    assert result_markdown == expected_markdown, (
+        f"Результат перевода не совпадает с ожидаемым.\n\n"
+        f"=== ОЖИДАЕМЫЙ ({len(expected_markdown)} символов) ===\n{expected_markdown}\n\n"
+        f"=== ПОЛУЧЕНЫЙ ({len(result_markdown)} символов) ===\n{result_markdown}\n\n"
+        f"=== РАЗНИЦА (посимвольно) ===\n"
+        f"Длина ожидаемого: {len(expected_markdown)}, длина полученного: {len(result_markdown)}\n"
+    )
 
 
 @pytest.mark.parametrize("empty_input", ["", "   ", "\n\n"])
