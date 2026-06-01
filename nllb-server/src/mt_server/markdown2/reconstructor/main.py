@@ -278,6 +278,11 @@ class MarkdownReconstructor:
         """Обрабатывает закрытие контекстного блока."""
         logger.debug("Context block close: type=%s", base_type)
 
+        # === ТАБЛИЦЫ: обработка закрытия ячеек ===
+        if base_type in ("th", "td"):
+            self._table_handler.handle_cell_close(base_type)
+            return
+
         # Снимаем контекстный блок dt/dd со стека
         if self._state_machine.pop_block(base_type):
             pass  # Логирование уже есть в pop_block

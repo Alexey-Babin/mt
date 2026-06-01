@@ -24,11 +24,9 @@ class TableHandler:
 
     def handle_cell_open(self, unit: TranslationUnit):
         """Обрабатывает открытие ячейки таблицы (th/td).
-
-        Для открывающих тегов: ничего не делаем, содержимое будет обработано отдельно.
-        | перед содержимым не нужен, так как мы добавляем | после предыдущей ячейки.
+        Добавляет | перед содержимым ячейки.
         """
-        pass
+        self._writer.write_raw("|")
 
     def handle_cell_close(self, base_type: str):
         """Обрабатывает закрытие ячейки таблицы.
@@ -47,6 +45,9 @@ class TableHandler:
         if self._writer.contains_pipe() and not self._state_machine.is_inside_list():
             col_count = self._writer.count_table_columns()
             if col_count > 0:
+                # Добавляем перенос строки перед разделителем, если нужно
+                if not self._writer.ends_with_newline():
+                    self._writer.write_raw("\n")
                 separator = "|" + "|".join(["------"] * col_count) + "|\n"
                 self._writer.write_raw(separator)
                 logger.debug("Added table separator: %s", separator.strip())
@@ -75,8 +76,7 @@ class TableHandler:
 
         Гарантирует перенос строки после закрытия строки.
         """
-        if not self._writer.ends_with_newline():
-            self._writer.write_raw("\n")
+        self._writer.write_raw("\n")
 
     def handle_thead_open(self):
         """Обрабатывает открытие thead.
