@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import List, Optional, Tuple
 
 from markdown_it.tree import SyntaxTreeNode
@@ -11,6 +12,20 @@ from .translation_unit import TranslationUnit
 from .translation_unit_type import TranslationUnitType
 
 logger = logging.getLogger("uvicorn.error")
+
+
+def _extract_heading_level(node: SyntaxTreeNode) -> int:
+    """Извлекает уровень заголовка из тега (например, 'h2' -> 2).
+
+    markdown-it-py не устанавливает node.level для заголовков,
+    поэтому извлекаем уровень из тега (tag='h1', 'h2', ...).
+    """
+    HEADING_TAG_PATTERN = re.compile(r"^h([1-6])$")
+    tag = node.tag or ""
+    match = HEADING_TAG_PATTERN.match(tag)
+    if match:
+        return int(match.group(1))
+    return 1  # fallback на h1 по умолчанию
 
 
 class ASTWalker:
@@ -134,7 +149,7 @@ class ASTWalker:
             # чтобы обработать дочерние инлайн-элементы (code_inline, strong, em...)
             if node.type == "inline":
                 for idx, child in enumerate(node.children or []):
-                    self._traverse(child, parent_id=parent_id, index=idx)
+                    self._collect_inline(child, parent_id, idx)
                 return
 
             self._handle_structural_block(node, parent_id, index)
@@ -168,7 +183,9 @@ class ASTWalker:
             need_translation=True,
             parent_id=parent_id,
             index_in_parent=index,
-            level=node.level,
+            level=(
+                _extract_heading_level(node) if clean_type == "heading" else node.level
+            ),
             tag=node.tag,
             attrs=dict(node.attrs) if node.attrs else {},
         )
