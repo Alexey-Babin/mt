@@ -573,6 +573,20 @@ class MarkdownReconstructor:
                 result = f"![{alt}]({src}{title})"
                 logger.debug(" Restored image: src=%s", src)
                 return result
+            elif ph.node_type == "html_inline":
+                # Особая обработка для task-list checkbox
+                content = str(ph.original_markup)
+                if 'class="task-list-item-checkbox"' in content:
+                    # Конвертируем HTML checkbox обратно в markdown синтаксис
+                    if 'checked="checked"' in content or "checked" in content:
+                        result = "- [x]"
+                        logger.debug(" Restored checked task list item")
+                    else:
+                        result = "- [ ]"
+                        logger.debug(" Restored unchecked task list item")
+                    return result
+                # Для других html_inline возвращаем оригинальное содержимое
+                return content
 
             return str(ph.original_markup)
 
