@@ -176,9 +176,12 @@ class MarkdownReconstructor:
 
     def _handle_structural_open(self, base_type: str, unit: TranslationUnit):
         """Обрабатывает открытие структурного блока."""
-        # Если новый блок имеет level=0 (корневой уровень), закрываем все открытые списки
-        if unit.level == 0 and base_type in ("dl", "bullet_list", "ordered_list"):
+        # Закрываем все открытые списки перед dl, чтобы термины не наследовали отступ
+        if base_type == "dl":
             self._close_all_lists()
+
+        # НЕ закрываем списки автоматически - это ломает вложенность
+        # Вложенные списки имеют тот же level=0, но должны оставаться внутри родительского списка
         block_data = self._state_machine.handle_structural_open(base_type, unit)
         if block_data:
             self._state_machine.push_block(

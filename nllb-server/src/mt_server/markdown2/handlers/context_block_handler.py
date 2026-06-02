@@ -89,7 +89,9 @@ class ContextBlockHandler:
             return True
 
         # Обработка открывающего/базового блока
-        # Для ячеек таблицы (th, td) используем nesting для определения закрывающего токена
+        # Для ячеек таблицы (th, td) и элементов списка определений (dt, dd)
+        # определяем закрывающий токен по наличию суффикса _close в исходных токенах
+        # В SyntaxTreeNode закрывающие узлы не имеют children
         is_close = node.type.endswith("_close") or (
             node.type in ("th", "td") and not node.children
         )
@@ -168,7 +170,7 @@ class ContextBlockHandler:
         )
 
         # Для базовых типов блоков (без суффиксов) сразу создаём закрывающий маркер
-        # ИСКЛЮЧЕНИЕ: dt и dd не закрываем сразу, т.к. они могут содержать paragraph
+        # dt и dd обрабатываются отдельно: закрывающий маркер создаётся после обработки детей
         has_closing_pair = getattr(node, "nesting", 1) == 1
         if (
             not node.type.endswith("_open")
@@ -203,7 +205,6 @@ class ContextBlockHandler:
             )
             self._walker.units.append(close_unit)
             self._context_stack.pop()
-
         return True
 
     def _handle_close(self, node: SyntaxTreeNode, parent_id: Optional[str], index: int):
