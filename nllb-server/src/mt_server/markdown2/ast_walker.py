@@ -96,6 +96,13 @@ class ASTWalker:
                 self._traverse(child, parent_id=parent_id, index=idx)
             return
 
+        # Узел inline - контейнер для инлайн-элементов внутри paragraph
+        # Важно: сам узел inline имеет тип structural_ignore, но его дети должны быть обработаны
+        if node.type == "inline":
+            # Делегируем обработку детей InlineCollector для сбора текста и плейсхолдеров
+            self._collect_inline(node, parent_id, index)
+            return
+
         # Пробуем обработать через handlers по приоритету
         # 1. Контекстные блоки (абзацы, заголовки) - имеют наивысший приоритет
         if self._context_block_handler.handle_node(node, parent_id, index):

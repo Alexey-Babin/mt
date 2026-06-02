@@ -127,10 +127,10 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "    - Nested Item 1.1\n\n"
         "Term text\n"
         ": Definition text\n\n"
-        "```python\n"
-        "def hello():\n"
-        "    print('world')\n"
-        "```\n\n"
+        "> ```python\n"
+        "> def hello():\n"
+        ">     print('world')\n"
+        "> ```\n\n"
         "| Name | Age |\n"
         "|------|-----|\n"
         "| John | 30  |\n"
@@ -153,10 +153,10 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "    - Вложенный элемент 1.1\n\n"
         "Текст термина\n"
         ": Текст определения\n\n"
-        "```python\n"
-        "def hello():\n"
-        "    print('мир')\n"
-        "```\n\n"
+        "> ```python\n"
+        "> def hello():  # функция приветствия\n"
+        ">     print('мир')  # печатает мир\n"
+        "> ```\n\n"
         "| Имя | Возраст |\n"
         "|------|------|\n"
         "| Джон | 30 |\n"
@@ -165,7 +165,6 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "- [ ] Ожидающая задача\n\n"
         "Некоторый текст после."
     )
-
     # 3. Создаем переводчик для конкретного текста и прогоняем через главный метод оркестратора
     translator = mock_translator(source_markdown)
     result_markdown = translator.process()

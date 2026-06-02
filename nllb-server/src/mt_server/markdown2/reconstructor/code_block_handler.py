@@ -38,6 +38,19 @@ class CodeBlockHandler:
             self._writer.write_raw(prefix)
 
         info_str = unit.info or ""
+        code_lines = unit.original_text.rstrip("\n").split("\n")
+
+        # Если есть префикс вложенности (например, мы в цитате),
+        # добавляем его к КАЖДОЙ строке кода, включая маркеры fence
+        if prefix:
+            lines_with_prefix = [f"{prefix}```{info_str}\n"]
+            for line in code_lines:
+                lines_with_prefix.append(f"{prefix}{line}\n")
+            lines_with_prefix.append(f"{prefix}```\n\n")
+            code_content = "".join(lines_with_prefix)
+        else:
+            code_content = f"```{info_str}\n{unit.original_text}```\n\n"
+
         self._writer.write_raw(f"```{info_str}\n")
 
         # 2. Пишем содержимое кода, добавляя префикс к каждой строке

@@ -35,6 +35,13 @@ class InlineCollector:
         )
         unit_type = get_unit_type(node.type)
 
+        # Узел inline - контейнер для инлайн-элементов, обрабатываем его детей
+        if node.type == "inline":
+            for idx, child in enumerate(node.children or []):
+                self.collect(child, parent_id, idx)
+            return
+
+        unit_type = get_unit_type(node.type)
         # Сценарий А (Конец): Наткнулись на закрывающий тег контекстного блока
         if unit_type == TranslationUnitType.CONTEXT_BLOCK and node.type.endswith(
             "_close"
@@ -80,12 +87,6 @@ class InlineCollector:
             self._handle_inline_element(
                 node, parent_id, index, current_manager, current_unit
             )
-            return
-
-        # В самом конце для любых других узлов внутри абзаца
-        if node.type == "inline":
-            for idx, child in enumerate(node.children):
-                self.collect(child, parent_id, idx)
             return
 
     def _handle_inline_element(
