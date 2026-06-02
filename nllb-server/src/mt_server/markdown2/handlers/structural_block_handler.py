@@ -58,6 +58,16 @@ class StructuralBlockHandler:
             "_close"
         )
 
+        # Для одиночных токенов (fence, code_block с nesting=0) создаём пару open/close сразу
+        if is_base_type and node.type in (
+            "fence",
+            "code_block",
+            "math_block",
+            "html_block",
+        ):
+            self._handle_open(node, parent_id, index)
+            return
+
         if is_base_type:
             self._handle_open(node, parent_id, index)
         elif node.type.endswith("_close"):
@@ -103,7 +113,8 @@ class StructuralBlockHandler:
             close_node_id = self._walker._generate_node_id()
             close_unit = UnitFactory.create_close_marker(
                 node_id=close_node_id,
-                node_type=node.type,
+                node_type=node.type
+                + "_close",  # Добавляем суффикс _close для закрывающего маркера
                 unit_type=TranslationUnitType.STRUCTURAL_IGNORE,
                 parent_id=parent_id,
                 index_in_parent=index,

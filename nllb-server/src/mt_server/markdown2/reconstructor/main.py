@@ -105,9 +105,10 @@ class MarkdownReconstructor:
 
         # Хронологический перехват блоков кода (fence, code_block) и разделителей (hr)
         if base_type in ("fence", "code_block"):
+            # Обрабатываем если: это открывающий маркер ИЛИ это базовый тип без суффиксов
             if is_open or (not is_open and not is_close):
                 self._code_block_handler.handle_fence(unit)
-            return  # Игнорируем fence_close, предотвращая засорение стека блоков
+            return  # Игнорируем fence_close и повторные обработки базовых типов
 
         if unit.node_type == "hr":
             self._code_block_handler.handle_hr()

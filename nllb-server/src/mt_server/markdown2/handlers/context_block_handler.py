@@ -91,7 +91,7 @@ class ContextBlockHandler:
         # Обработка открывающего/базового блока
         # Для ячеек таблицы (th, td) используем nesting для определения закрывающего токена
         is_close = node.type.endswith("_close") or (
-            node.type in ("th", "td") and getattr(node, "nesting", 0) == -1
+            node.type in ("th", "td", "dt", "dd") and getattr(node, "nesting", 0) == -1
         )
 
         if not is_close:
@@ -164,7 +164,12 @@ class ContextBlockHandler:
 
         # Для базовых типов блоков (без суффиксов) сразу создаём закрывающий маркер
         # ИСКЛЮЧЕНИЕ: dt и dd не закрываем сразу, т.к. они могут содержать paragraph
-        if not node.type.endswith("_open") and clean_type not in ("dt", "dd"):
+        has_closing_pair = getattr(node, "nesting", 1) == 1
+        if (
+            not node.type.endswith("_open")
+            and clean_type not in ("dt", "dd", "th", "td")
+            and has_closing_pair
+        ):
             close_node_id = self._walker._generate_node_id()
             close_unit = UnitFactory.create_close_marker(
                 node_id=close_node_id,

@@ -98,7 +98,7 @@ class TestFullPipelineIssues:
         >     print('world')
         > ```
         """
-        source_markdown = "> ```python\ndef hello():\n    print('world')\n```"
+        source_markdown = "> ```python\n> def hello():\n>     print('world')\n> ```"
 
         translation_dict = {}
 
