@@ -91,8 +91,13 @@ class ContextBlockHandler:
         # Обработка открывающего/базового блока
         # Для ячеек таблицы (th, td) используем nesting для определения закрывающего токена
         is_close = node.type.endswith("_close") or (
-            node.type in ("th", "td", "dt", "dd") and getattr(node, "nesting", 0) == -1
+            node.type in ("th", "td") and not node.children
         )
+
+        # Для dt/dd - это всегда открывающие блоки (они содержат children в SyntaxTreeNode)
+        # Закрывающие маркеры dt_close/dd_close обрабатываются отдельно через _handle_close
+        if node.type in ("dt", "dd") and node.children:
+            is_close = False
 
         if not is_close:
             self._handle_open(node, parent_id, index)
@@ -167,7 +172,7 @@ class ContextBlockHandler:
         has_closing_pair = getattr(node, "nesting", 1) == 1
         if (
             not node.type.endswith("_open")
-            and clean_type not in ("dt", "dd", "th", "td")
+            and clean_type not in ("dt", "dd")
             and has_closing_pair
         ):
             close_node_id = self._walker._generate_node_id()
@@ -182,6 +187,23 @@ class ContextBlockHandler:
             )
             self._walker.units.append(close_unit)
             self._context_stack.pop()
+
+        # Для dt/dd создаём закрывающий маркер после обработки детей
+        # т.к. в SyntaxTreeNode они представлены как единые узлы без _close суффикса
+        if clean_type in ("dt", "dd"):
+            close_node_id = self._walker._generate_node_id()
+            close_unit = UnitFactory.create_close_marker(
+                node_id=close_node_id,
+                node_type=f"{clean_type}_close",
+                unit_type=TranslationUnitType.CONTEXT_BLOCK,
+                parent_id=parent_id,
+                index_in_parent=index,
+                level=node_info["level"],
+                tag=node_info["tag"],
+            )
+            self._walker.units.append(close_unit)
+            self._context_stack.pop()
+
         return True
 
     def _handle_close(self, node: SyntaxTreeNode, parent_id: Optional[str], index: int):
