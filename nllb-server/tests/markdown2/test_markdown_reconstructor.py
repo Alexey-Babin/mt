@@ -497,5 +497,5 @@ def test_reconstruct_fence_inside_blockquote(reconstructor):
 
     result = reconstructor.reconstruct([bq_open, fence_node, bq_close])
 
-    expected = "> ```python\ndef hello():\n    print('world')\n```\n\n"
+    expected = "> ```python\n> def hello():\n>     print('world')\n> ```\n\n"
     assert result == expected

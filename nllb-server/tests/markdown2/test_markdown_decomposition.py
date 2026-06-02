@@ -149,3 +149,67 @@ class TestFullPipelineDecomposition:
         result = translator.process()
 
         assert "Некоторый текст после." in result, "Финальный абзац не переведён"
+
+    # 1. Тест таблицы с проверкой структуры
+    def test_table_structure_preserved(self, mock_translator):
+        """Таблица должна сохранять все | разделители."""
+        source = "| A | B |\n|---|---|\n| 1 | 2 |"
+        translation_dict = {"A": "А", "B": "Б", "1": "1", "2": "2"}
+        translator = mock_translator(source, translation_dict)
+        result = translator.process()
+
+        assert result.count("|") >= 8, "Разделители таблицы потеряны"
+        assert "|------|" in result or "|---|" in result, (
+            "Разделительная строка повреждена"
+        )
+
+    # 2. Тест task list с checkbox
+    def test_task_list_checkbox_preserved(self, mock_translator):
+        """Checkbox должен сохраняться как [- [x]] или [- [ ]]."""
+        source = "- [x] Task"
+        translation_dict = {"{html_1} Task": "{html_1} Задача"}
+        translator = mock_translator(source, translation_dict)
+        result = translator.process()
+
+        # Не должно быть дублирования "- -"
+        assert not result.startswith("- -"), "Дублируется маркер списка"
+        assert "[x]" in result, "Checkbox потерян"
+
+    # 3. Тест code в blockquote
+    def test_code_fence_in_blockquote(self, mock_translator):
+        """Fence внутри blockquote должен сохранять > префикс."""
+        source = "> ```python\ncode\n```"
+        translator = mock_translator(source, {})
+        result = translator.process()
+
+        assert ">" in result, "Цитата потеряна"
+        assert "```" in result, "Fence потерян"
+        # Код должен быть внутри цитаты
+        lines = result.split("\n")
+        code_lines = [l for l in lines if "code" in l]
+        assert all(l.startswith(">") for l in code_lines), "Код вне цитаты"
+
+    # 4. Тест spacing между блоками
+    def test_spacing_between_blocks(self, mock_translator):
+        """Между заголовком и параграфом должен быть пустой строка."""
+        source = "## Title\n\nParagraph"
+        translation_dict = {"Title": "Заголовок", "Paragraph": "Абзац"}
+        translator = mock_translator(source, translation_dict)
+        result = translator.process()
+
+        assert "\n\n" in result, "Отсутствует разделение между блоками"
+
+    # 5. Тест inline элементов (bold + link)
+    def test_inline_bold_link_restoration(self, mock_translator):
+        """Bold и ссылка должны восстанавливаться корректно."""
+        source = "**bold** and [link](http://test.com)"
+        translation_dict = {
+            "{s_1}bold{/s_1}": "{s_1}жирный{/s_1}",
+            "{lnk_1}link{/lnk_1}": "{lnk_1}ссылка{/lnk_1}",
+        }
+        translator = mock_translator(source, translation_dict)
+        result = translator.process()
+
+        assert "**" in result, "Bold не восстановлен"
+        assert "[" in result and "]" in result, "Ссылка не восстановлена"
+        assert "http://test.com" in result, "URL потерян"

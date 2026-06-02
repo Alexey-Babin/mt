@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python *)",
-      "Bash(which *)"
+      "Bash(which *)",
+      "Bash(uv *)"
     ]
   },
   "$version": 4

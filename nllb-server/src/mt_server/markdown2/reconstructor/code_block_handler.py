@@ -30,17 +30,32 @@ class CodeBlockHandler:
         """
         logger.debug("  Writing code block: info_str=%s", unit.info or "")
 
-        # 1. Перед блоком кода выставляем текущий префикс вложенности (> ),
-        # чтобы сам маркер открытия ``` встал на правильный уровень структуры цитаты
+        # Получаем текущий префикс вложенности (например, "> " для цитат)
         prefix, _ = self._state_machine.get_current_prefix(for_block_start=False)
+
+        # 1. Пишем открывающий маркер fence с префиксом
         if prefix and (not self._writer.buffer or self._writer.ends_with_newline()):
             self._writer.write_raw(prefix)
 
-        # 2. Пишем сам блок кода НАПРЯМУЮ в буфер.
-        # Это гарантирует, что внутренние строки кода останутся чистыми и без префиксов '> '.
         info_str = unit.info or ""
-        code_content = f"```{info_str}\n{unit.original_text}```\n\n"
-        self._writer.write_raw(code_content)
+        self._writer.write_raw(f"```{info_str}\n")
+
+        # 2. Пишем содержимое кода, добавляя префикс к каждой строке
+        code_content = unit.original_text.rstrip("\n")
+        code_lines = code_content.split("\n")
+        for line in code_lines:
+            if prefix:
+                self._writer.write_raw(f"{prefix}{line}\n")
+            else:
+                self._writer.write_raw(f"{line}\n")
+
+        # 3. Пишем закрывающий маркер fence с префиксом
+        if prefix:
+            self._writer.write_raw(f"{prefix}```\n")
+        else:
+            self._writer.write_raw("```\n")
+
+        self._writer.write_raw("\n")
 
     def handle_hr(self):
         """Обрабатывает горизонтальный разделитель."""

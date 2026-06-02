@@ -201,11 +201,17 @@ class MarkdownReconstructor:
 
     def _handle_structural_close(self, base_type: str):
         """Обрабатывает закрытие структурного блока."""
+        # Особая обработка для blockquote - закрываем только если действительно внутри цитаты
+        if base_type == "blockquote":
+            if self._state_machine.is_inside_blockquote():
+                self._state_machine.pop_block(base_type)
+                self._writer.ensure_newline()
+            return
+
         self._state_machine.pop_block(base_type)
 
         # Добавляем перенос строки после закрытия контейнеров
         if base_type in (
-            "blockquote",
             "bullet_list",
             "ordered_list",
             "table",
@@ -290,8 +296,9 @@ class MarkdownReconstructor:
         else:
             block_content = restored_markdown
 
-        # Для ячеек таблицы не используем префиксы
+        # Для ячеек таблицы пишем | перед содержимым
         if base_type in ("th", "td"):
+            self._writer.write_raw("|")
             self._writer.write_raw(block_content)
         else:
             self._writer.write_with_prefix(block_content)
@@ -318,9 +325,13 @@ class MarkdownReconstructor:
             "dt",
             "dd",
         ):
-            # Для paragraph на верхнем уровне добавляем двойной перенос строки
+            # Для paragraph и heading на верхнем уровне добавляем двойной перенос строки
+            # Но heading должен иметь только одинарный \n согласно спецификации теста
             if base_type == "paragraph" and self._state_machine.stack_size == 0:
                 self._writer.ensure_double_newline()
+            elif base_type == "heading":
+                # Заголовки всегда заканчиваются на одинарный \n
+                self._writer.ensure_newline()
             else:
                 self._writer.ensure_newline()
 

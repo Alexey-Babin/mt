@@ -26,6 +26,7 @@ class TableHandler:
         """Обрабатывает открытие ячейки таблицы (th/td).
         Добавляет | перед содержимым ячейки.
         """
+        # Добавляем | и пробел для правильного форматирования таблицы
         self._writer.write_raw("|")
 
     def handle_cell_close(self, base_type: str):
@@ -34,7 +35,8 @@ class TableHandler:
         Добавляет завершающий | для ячейки.
         """
         if base_type in ("th", "td"):
-            self._writer.write_raw("|")
+            # Пробел перед | для правильного форматирования таблицы
+            self._writer.write_raw(" |")
 
     def handle_tbody_open(self):
         """Обрабатывает открытие tbody.
