@@ -165,8 +165,7 @@ class TestFullPipelineIssues:
         source_markdown = "- [x] Done task\n- [ ] Pending task"
 
         translation_dict = {
-            "{chk_1}Done task": "{chk_1}Выполнена",
-            "{chk_2}Pending task": "{chk_2}В ожидании",
+            "{chk_1} Done task\x1e{chk_1} Pending task": "{chk_1}Выполнена\x1e{chk_1}В ожидании",
         }
 
         translator = mock_translator(source_markdown, translation_dict)

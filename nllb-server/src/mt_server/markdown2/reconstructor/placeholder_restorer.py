@@ -136,8 +136,17 @@ class PlaceholderRestorer:
                 return match.group(0)  # Фолбек: возвращаем как есть, если тег сломан
 
             if prefix == "lnk":
-                href = ph.original_markup.get("href", "")
-                title = f' "{t}"' if (t := ph.original_markup.get("title")) else ""
+                href = (
+                    ph.original_markup.get("href", "")
+                    if isinstance(ph.original_markup, dict)
+                    else ""
+                )
+                title_val = (
+                    ph.original_markup.get("title")
+                    if isinstance(ph.original_markup, dict)
+                    else None
+                )
+                title = f' "{title_val}"' if title_val else ""
                 result = f"[{inner_content}]({href}{title})"
                 logger.debug("Restored link: href=%s", href)
                 return result
@@ -190,7 +199,7 @@ class PlaceholderRestorer:
             return self._restore_break(ph)
         elif ph.node_type == "image":
             return self._restore_image(ph, unit)
-        elif ph.node_type == "html_inline":
+        elif ph.node_type == "html_inline" or (ph.tag_mask.strip().startswith("{chk_")):
             return self._restore_html_inline(ph)
 
         return str(ph.original_markup)
@@ -217,8 +226,14 @@ class PlaceholderRestorer:
 
     def _restore_image(self, ph: Placeholder, unit: TranslationUnit) -> str:
         """Восстанавливает изображение."""
+        if not isinstance(ph.original_markup, dict):
+            logger.warning("Image placeholder has non-dict original_markup")
+            return str(ph.original_markup)
+
         src = ph.original_markup.get("src", "")
-        title = f' "{t}"' if (t := ph.original_markup.get("title")) else ""
+        title_val = ph.original_markup.get("title")
+        title = f' "{title_val}"' if title_val else ""
+
         alt = ph.original_markup.get("alt", "") or unit.original_text or "image"
         result = f"![{alt}]({src}{title})"
         logger.debug(" Restored image: src=%s", src)
@@ -232,10 +247,10 @@ class PlaceholderRestorer:
         if 'class="task-list-item-checkbox"' in content:
             if 'checked="checked"' in content or "checked" in content:
                 logger.debug(" Restored checked task list item")
-                return "- [x]"
+                return "[x]"
             else:
                 logger.debug(" Restored unchecked task list item")
-                return "- [ ]"
+                return "[ ]"
 
         # Для других html_inline возвращаем оригинальное содержимое
         return content

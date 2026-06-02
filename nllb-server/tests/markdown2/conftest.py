@@ -42,6 +42,10 @@ class MockTranslationEngine:
 
     def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
         """Посегментный перевод чанка с сохранением маркера разделителя."""
+        # Сначала пробуем найти полное совпадение всего текста
+        if text in self._translation_dict:
+            return self._translation_dict[text]
+
         segments = [s.strip() for s in text.split("\x1e")]
         translated_segments = []
 

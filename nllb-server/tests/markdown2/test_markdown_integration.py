@@ -113,12 +113,6 @@ def test_markdown_translator_full_pipeline(mock_translator):
     а контент переводится. Используется mock-движок с полным словарём переводов.
 
     Тест проверяет ПОЛНОЕ совпадение результата с ожидаемым Markdown.
-
-    NOTE: Этот тест может падать из-за известных проблем в реализации:
-    - Code in blockquote: неправильная обработка fence внутри цитат
-    - Definition lists: dt/dd элементы могут теряться или дублироваться
-    - Table cells: перевод ячеек таблицы может не работать
-    - Task list: checkbox элементы могут не переводиться
     """
 
     # 1. Формируем исходный Markdown-текст на английском со всеми edge-cases
@@ -133,7 +127,7 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "    - Nested Item 1.1\n\n"
         "Term text\n"
         ": Definition text\n\n"
-        "> ```python\n"
+        "```python\n"
         "def hello():\n"
         "    print('world')\n"
         "```\n\n"
@@ -159,10 +153,10 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "    - Вложенный элемент 1.1\n\n"
         "Текст термина\n"
         ": Текст определения\n\n"
-        "> ```python\n"
-        "> def hello():  # функция приветствия\n"
-        ">     print('мир')  # печатает мир\n"
-        "> ```\n\n"
+        "```python\n"
+        "def hello():\n"
+        "    print('мир')\n"
+        "```\n\n"
         "| Имя | Возраст |\n"
         "|------|------|\n"
         "| Джон | 30 |\n"

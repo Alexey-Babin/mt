@@ -58,13 +58,26 @@ class PlaceholderManager:
         }
         return mapping.get(base_type, "ph")
 
+    def _is_tasklist_checkbox(self, node: SyntaxTreeNode) -> bool:
+        """Проверяет, является ли html_inline токеном чекбокса task-list."""
+        if node.type != "html_inline":
+            return False
+        content = node.content or ""
+        return 'class="task-list-item-checkbox"' in content
+
     def create_placeholder(self, node: SyntaxTreeNode) -> Placeholder:
         """Создает placeholder из узла AST, извлекая оригинальную разметку."""
-        unit_type = get_unit_type(node.type)
-        strategy = self._determine_strategy(unit_type)
-
-        is_closing = node.type.endswith("_close")
-        prefix = self._get_short_prefix(node.type)
+        # Особая обработка для task-list checkbox - трактуем как tasklist_item
+        if self._is_tasklist_checkbox(node):
+            unit_type = TranslationUnitType.INLINE_PROTECT
+            strategy = "INLINE_PROTECT"
+            prefix = "chk"
+            is_closing = False
+        else:
+            unit_type = get_unit_type(node.type)
+            strategy = self._determine_strategy(unit_type)
+            is_closing = node.type.endswith("_close")
+            prefix = self._get_short_prefix(node.type)
 
         # 1. Синхронизация ID для парных и одиночных тегов
         if is_closing:
@@ -92,7 +105,11 @@ class PlaceholderManager:
         original_markup: Union[str, Dict[str, Any]] = ""
 
         if strategy == "INLINE_PROTECT":
-            if node.type == "code_inline":
+            # Особая обработка для task-list checkbox
+            if self._is_tasklist_checkbox(node):
+                # Сохраняем полный HTML чекбокса для восстановления
+                original_markup = node.content or ""
+            elif node.type == "code_inline":
                 original_markup = f"`{node.content}`"
             elif node.type == "math_inline":
                 original_markup = f"${node.content}$"
