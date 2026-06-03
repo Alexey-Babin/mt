@@ -158,7 +158,7 @@ class TestFullPipelineDecomposition:
         translator = mock_translator(source, translation_dict)
         result = translator.process()
 
-        assert result.count("|") >= 8, "Разделители таблицы потеряны"
+        assert result.count("|") >= 8, f"Разделители таблицы потеряны:\n{result}"
         assert "|------|" in result or "|---|" in result, (
             "Разделительная строка повреждена"
         )

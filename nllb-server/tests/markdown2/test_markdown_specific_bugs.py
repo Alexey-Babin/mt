@@ -164,10 +164,12 @@ class TestFullPipelineIssues:
         """
         source_markdown = "- [x] Done task\n- [ ] Pending task"
 
-        # html_inline используется для checkbox, т.к. парсер создаёт html_inline токен
+        # Парсер создаёт html_inline токен для checkbox, но PlaceholderManager
+        # распознаёт task-list checkbox и использует префикс "chk" (не "html").
+        # Между плейсхолдером и текстом есть пробел (из text-узла markdown-it).
         translation_dict = {
-            "{html_1}Done task": "{html_1}Выполнена",
-            "{html_1}Pending task": "{html_1}В ожидании",
+            "{chk_1} Done task": "{chk_1} Выполнена",
+            "{chk_1} Pending task": "{chk_1} В ожидании",
         }
 
         translator = mock_translator(source_markdown, translation_dict)

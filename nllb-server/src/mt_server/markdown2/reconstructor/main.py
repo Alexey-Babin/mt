@@ -296,9 +296,7 @@ class MarkdownReconstructor:
         else:
             block_content = restored_markdown
 
-        # Для ячеек таблицы пишем | перед содержимым
         if base_type in ("th", "td"):
-            self._writer.write_raw("|")
             self._writer.write_raw(block_content)
         else:
             self._writer.write_with_prefix(block_content)
