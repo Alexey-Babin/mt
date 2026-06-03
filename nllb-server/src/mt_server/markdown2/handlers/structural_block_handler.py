@@ -129,6 +129,32 @@ class StructuralBlockHandler:
             for idx, child in enumerate(node.children):
                 self._walker._traverse(child, parent_id=node_id, index=idx)
 
+        # Создаём закрывающий маркер для всех парных структурных блоков,
+        # которые SyntaxTreeNode представляет как один узел без суффиксов _open/_close.
+        # Это blockquote, bullet_list, ordered_list, list_item, dl, table и её части.
+        _PAIRED_STRUCTURAL_BLOCKS = {
+            "table", "thead", "tbody", "tr",
+            "blockquote",
+            "bullet_list", "ordered_list", "list_item",
+            "dl", "field_list", "field",
+            "footnote_block",
+        }
+        if node.type in _PAIRED_STRUCTURAL_BLOCKS:
+            close_node_id = self._walker._generate_node_id()
+            close_unit = UnitFactory.create_close_marker(
+                node_id=close_node_id,
+                node_type=f"{node.type}_close",
+                unit_type=TranslationUnitType.STRUCTURAL_IGNORE,
+                parent_id=parent_id,
+                index_in_parent=index,
+                level=node_info["level"],
+                tag=node_info["tag"],
+            )
+            self._walker.units.append(close_unit)
+            logger.debug(
+                "Created close marker for structural block: %s_close", node.type
+            )
+
     def _handle_close(
         self,
         node: SyntaxTreeNode,

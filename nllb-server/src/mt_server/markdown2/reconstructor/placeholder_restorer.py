@@ -67,16 +67,35 @@ class PlaceholderRestorer:
         """Нормализует текст, убирая фантомные пробелы вокруг масок.
 
         Приводит маски к стандартному виду "{tag_id}".
+        Не добавляет пробел после закрывающего тега, если следующий символ - пунктуация.
         """
         normalized_text = text
         for ph in placeholders:
             clean_mask = ph.tag_mask.strip()
-            # Находим в тексте маску с любым количеством пробелов вокруг неё и сжимаем отступы
-            normalized_text = re.sub(
-                r"\s*\{\s*" + re.escape(clean_mask[1:-1]) + r"\s*\}\s*",
-                f" {clean_mask} ",
-                normalized_text,
-            )
+            inner_mask = clean_mask[1:-1]
+            
+            if ph.is_closing:
+                # Для закрывающих тегов: пробел перед тегом
+                # После тега: пробел НЕ добавляем, если следующий символ - пунктуация
+                # Сначала обрабатываем случай с пунктуацией
+                normalized_text = re.sub(
+                    r"\s*\{\s*" + re.escape(inner_mask) + r"\s*\}\s*([.,!?;:])",
+                    f" {clean_mask}\\1",
+                    normalized_text,
+                )
+                # Затем обрабатываем остальные случаи (если ещё не обработано)
+                normalized_text = re.sub(
+                    r"\s*\{\s*" + re.escape(inner_mask) + r"\s*\}(?!\s*[.,!?;:])(\s*)",
+                    lambda m: f" {clean_mask} " if m.group(1) or not m.end() == len(normalized_text) else f" {clean_mask}",
+                    normalized_text,
+                )
+            else:
+                # Для открывающих тегов: пробелы с обеих сторон
+                normalized_text = re.sub(
+                    r"\s*\{\s*" + re.escape(inner_mask) + r"\s*\}\s*",
+                    f" {clean_mask} ",
+                    normalized_text,
+                )
         return normalized_text
 
     def restore(self, text: str, unit: TranslationUnit) -> str:

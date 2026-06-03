@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from threading import Lock
@@ -8,6 +9,9 @@ from transformers import AutoModelForSeq2SeqLM, NllbTokenizer
 
 from .config import settings
 from .languages import languages_db
+
+logger = logging.getLogger("uvicorn.error")
+
 
 MODEL_COMPILE = settings.model_compile
 LANG_PATTERN = re.compile(r"^[a-z]{3}_[A-Z][a-z]{3}$")
@@ -130,5 +134,5 @@ class NllbTranslationEngine:
                     translated = " " + translated.lstrip()
                 if text[-1].isspace() and not translated[-1].isspace():
                     translated = translated.rstrip() + " "
-
+        logger.debug(f"--- TRANSLATED ---:\n{text=}\n{translated=}\n------")
         return translated

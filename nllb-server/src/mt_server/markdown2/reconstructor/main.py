@@ -58,6 +58,7 @@ class MarkdownReconstructor:
 
         result = self._writer.get_buffer_content()
         logger.info("Reconstruction complete: output_length=%d characters", len(result))
+        logger.debug("FULL BUFFER:\n%s", repr(result))
         return result
 
     def _reset_state(self):
@@ -135,6 +136,7 @@ class MarkdownReconstructor:
 
         if is_open:
             self._handle_structural_open(base_type, unit)
+            logger.debug("AFTER_STRUCTURAL_OPEN(%s) buffer tail: %s", base_type, self._writer.buffer[-3:] if len(self._writer.buffer) >= 3 else self._writer.buffer)
 
         elif is_close:
             self._handle_structural_close(base_type)
@@ -147,6 +149,10 @@ class MarkdownReconstructor:
         Возвращает True, если это была таблица и обработка завершена.
         """
         if base_type in ("table", "thead"):
+            # Для table_close добавляем двойной перенос для разделения блоков
+            if base_type == "table" and is_close:
+                self._writer.ensure_double_newline()
+                logger.debug("TABLE_CLOSE: added double newline, buffer tail: %s", self._writer.buffer[-3:] if len(self._writer.buffer) >= 3 else self._writer.buffer)
             # Для таблиц мы не используем стек, а просто пропускаем эти узлы
             # Разделители | добавляются при обработке th/td ячеек
             return True
@@ -156,6 +162,7 @@ class MarkdownReconstructor:
                 self._table_handler.handle_tbody_open()
             else:
                 self._table_handler.handle_tbody_close()
+                logger.debug("TABLE_CLOSE buffer tail: %s", self._writer.buffer[-5:] if len(self._writer.buffer) >= 5 else self._writer.buffer)
             return True
 
         if base_type == "tr":
@@ -206,18 +213,28 @@ class MarkdownReconstructor:
             if self._state_machine.is_inside_blockquote():
                 self._state_machine.pop_block(base_type)
                 self._writer.ensure_newline()
+                logger.debug("BLOCKQUOTE_CLOSE buffer tail: %s", self._writer.buffer[-5:] if len(self._writer.buffer) >= 5 else self._writer.buffer)
             return
 
         self._state_machine.pop_block(base_type)
 
-        # Добавляем перенос строки после закрытия контейнеров
+        # Добавляем двойной перенос строки после закрытия контейнеров
+        # только если мы на верхнем уровне (не внутри другого списка)
         if base_type in (
             "bullet_list",
             "ordered_list",
-            "table",
             "dl",
         ):
-            self._writer.ensure_newline()
+            if self._state_machine.stack_size == 0:
+                self._writer.ensure_double_newline()
+                logger.debug("DOUBLE_NEWLINE after %s_close (top level), buffer tail: %s", base_type, self._writer.buffer[-3:] if len(self._writer.buffer) >= 3 else self._writer.buffer)
+            else:
+                self._writer.ensure_newline()
+                logger.debug("SINGLE_NEWLINE after %s_close (nested), buffer tail: %s", base_type, self._writer.buffer[-3:] if len(self._writer.buffer) >= 3 else self._writer.buffer)
+
+        # Для таблицы нужен двойной перенос для разделения блоков
+        if base_type == "table":
+            self._writer.ensure_double_newline()
 
     def _handle_special_case(self, unit: TranslationUnit):
         """Обрабатывает узлы метаданных Front Matter.
@@ -238,8 +255,8 @@ class MarkdownReconstructor:
 
             # Формируем валидный блок Front Matter
             # Метаданные всегда находятся на самом верхнем уровне документа
+            # Двойной перенос после --- для отделения от основного контента
             front_matter_block = f"---\n{fm_content}---\n\n"
-            front_matter_block = f"---\n{fm_content}---\n"
             self._writer.write_raw(front_matter_block)
             logger.debug(
                 "Front matter block written: length=%d characters",
@@ -296,9 +313,12 @@ class MarkdownReconstructor:
         else:
             block_content = restored_markdown
 
-        # Для ячеек таблицы пишем | перед содержимым
+        # Для ячеек таблицы добавляем | перед содержимым
         if base_type in ("th", "td"):
-            self._writer.write_raw("|")
+            self._table_handler.handle_cell_open(unit)
+            logger.debug(
+                "DEBUG TABLE: Writing content '%s' for %s", block_content, base_type
+            )
             self._writer.write_raw(block_content)
         else:
             self._writer.write_with_prefix(block_content)
@@ -326,12 +346,8 @@ class MarkdownReconstructor:
             "dd",
         ):
             # Для paragraph и heading на верхнем уровне добавляем двойной перенос строки
-            # Но heading должен иметь только одинарный \n согласно спецификации теста
-            if base_type == "paragraph" and self._state_machine.stack_size == 0:
+            if base_type in ("paragraph", "heading") and self._state_machine.stack_size == 0:
                 self._writer.ensure_double_newline()
-            elif base_type == "heading":
-                # Заголовки всегда заканчиваются на одинарный \n
-                self._writer.ensure_newline()
             else:
                 self._writer.ensure_newline()
 

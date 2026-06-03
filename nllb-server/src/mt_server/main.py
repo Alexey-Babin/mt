@@ -120,11 +120,13 @@ async def translate_endpoint(
         raise HTTPException(status_code=400, detail=err)
 
     try:
+        # Убираем из текста виндовые переносы:
+        text = request.text.replace("\r", "")
         # Выносим блокирующий вызов в отдельный поток через asyncio.to_thread()
         # Это предотвращает блокировку event loop при тяжелых операциях перевода
         result = await asyncio.to_thread(
             service.translate,
-            text=request.text,
+            text=text,
             src_lang=request.src_lang,
             tgt_lang=request.target_lang,
             format=request.format,

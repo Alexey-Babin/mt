@@ -45,6 +45,12 @@ class BlockWriter:
         # Сборка стартовой строки с учетом маркера списка (если он есть)
         start_prefix = line_prefix + item_marker
 
+        import logging
+        _logger = logging.getLogger("uvicorn.error")
+        _logger.debug("WRITE_WITH_PREFIX: text='%s', line_prefix='%s', item_marker='%s', start_prefix='%s', buffer_tail='%s'",
+                       text[:40], line_prefix, item_marker, start_prefix,
+                       self._buffer[-3:] if len(self._buffer) >= 3 else self._buffer)
+
         if not self._buffer or self._buffer[-1].endswith("\n"):
             self._buffer.append(start_prefix)
 

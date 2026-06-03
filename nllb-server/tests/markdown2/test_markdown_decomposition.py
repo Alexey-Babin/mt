@@ -178,7 +178,7 @@ class TestFullPipelineDecomposition:
     # 3. Тест code в blockquote
     def test_code_fence_in_blockquote(self, mock_translator):
         """Fence внутри blockquote должен сохранять > префикс."""
-        source = "> ```python\ncode\n```"
+        source = "> ```python\n> code\n> ```"
         translator = mock_translator(source, {})
         result = translator.process()
 

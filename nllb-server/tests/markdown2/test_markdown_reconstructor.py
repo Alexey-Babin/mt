@@ -67,8 +67,9 @@ def test_reconstruct_heading(reconstructor):
 
     result = reconstructor.reconstruct([u1, u2])
 
-    # Ожидаем префикс '## ' перед текстом заголовка
-    assert result == "## Заголовок\n"
+    # Ожидаем префикс '## ' перед текстом заголовка и двойной перенос после
+    # (для отделения от следующего блока в документе)
+    assert result == "## Заголовок\n\n"
 
 
 def test_reconstruct_inline_formatting_strong(reconstructor):
@@ -388,7 +389,7 @@ def test_reconstruct_nested_lists_with_indentation(reconstructor):
     )
 
     # Система должна вернуть звездочки вместо дефисов!
-    expected = "* Элемент 1\n    * Вложенный элемент\n"
+    expected = "* Элемент 1\n    * Вложенный элемент\n\n"
     assert result == expected
 
 
@@ -460,7 +461,7 @@ def test_reconstruct_definition_list(reconstructor):
         [dl_open, dt_open, dt_close, dd_open, dd_close, dl_close]
     )
 
-    expected = "Термин\n: Определение\n"
+    expected = "Термин\n: Определение\n\n"
     assert result == expected
 
 

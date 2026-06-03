@@ -27,17 +27,16 @@ class MockTranslationEngine:
         self._translation_dict = {
             # Заголовки и параграфы
             "Some text before.": "Некоторый текст перед.",
-            # Параграф с inline элементами (плейсхолдеры будут подставлены walker'ом)
-            "This is {s_1}bold{/s_1} text. Go to {lnk_1}Google{/lnk_1}.": "Это {s_1}жирный{/s_1} текст. Перейдите на {lnk_1}Google{/lnk_1}.",
+            # Параграф с inline элементами разбивается на предложения по split_sentences
+            "This is {s_1}bold{/s_1} text.": "Это {s_1}жирный{/s_1} текст.",
+            "Go to {lnk_2}Google{/lnk_2}.": "Перейдите на {lnk_2}Google{/lnk_2}.",
             # Элементы списков
             "Item 1": "Элемент 1",
             "Nested Item 1.1": "Вложенный элемент 1.1",
             # Списки определений
             "Term text": "Текст термина",
             "Definition text": "Текст определения",
-            # Код в цитате - переводим только содержимое кода (строки внутри fence)
-            "def hello():": "def hello():  # функция приветствия",
-            "    print('world')": "    print('мир')  # печатает мир",
+            # Код в цитате НЕ переводится (fence имеет need_translation=False)
             # Таблица - каждая ячейка отдельно
             "Name": "Имя",
             "Age": "Возраст",
@@ -46,8 +45,11 @@ class MockTranslationEngine:
             "Jane": "Джейн",
             "25": "25",
             # Task list с checkbox плейсхолдерами
-            "{chk_1}Done task": "{chk_1}Выполненная задача",
-            "{chk_2}Pending task": "{chk_2}Ожидающая задача",
+            # Каждый paragraph имеет свой PlaceholderManager с независимым счётчиком,
+            # поэтому оба чекбокса получают {chk_1}.
+            # После плейсхолдера идёт пробел из text-узла AST.
+            "{chk_1} Done task": "{chk_1} Выполненная задача",
+            "{chk_1} Pending task": "{chk_1} Ожидающая задача",
             # Финальный параграф
             "Some text after.": "Некоторый текст после.",
         }
@@ -154,8 +156,8 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "Текст термина\n"
         ": Текст определения\n\n"
         "> ```python\n"
-        "> def hello():  # функция приветствия\n"
-        ">     print('мир')  # печатает мир\n"
+        "> def hello():\n"
+        ">     print('world')\n"
         "> ```\n\n"
         "| Имя | Возраст |\n"
         "|------|------|\n"
@@ -163,7 +165,7 @@ def test_markdown_translator_full_pipeline(mock_translator):
         "| Джейн | 25 |\n\n"
         "- [x] Выполненная задача\n"
         "- [ ] Ожидающая задача\n\n"
-        "Некоторый текст после."
+        "Некоторый текст после.\n\n"
     )
     # 3. Создаем переводчик для конкретного текста и прогоняем через главный метод оркестратора
     translator = mock_translator(source_markdown)

@@ -1,8 +1,8 @@
 ---
 name: debugging-markdown-translation-tests
-description: Debug failing markdown translation tests by inspecting AST walk output and placeholder format
+description: Debug failing markdown translation tests by tracing buffer state, AST walk output, and reconstruction spacing
 source: auto-skill
-extracted_at: '2026-06-03T06:46:15.586Z'
+extracted_at: '2026-06-03T10:35:11.018Z'
 ---
 
 # Debugging Markdown Translation Tests
@@ -15,8 +15,37 @@ When markdown translation tests fail (especially "not translated" errors), the i
    - Task-list checkboxes (`html_inline` nodes with `class="task-list-item-checkbox"`) use prefix `chk`, not `html`
    - See `src/mt_server/markdown2/placeholder.py:55-66` for the mapping
 
-2. **Missing whitespace**: Text nodes from markdown-it include spaces between inline elements and text content
+2. **Wrong placeholder ID**: `PlaceholderManager` uses an incrementing counter, so IDs depend on the order of inline elements in the document
+   - Example: If a paragraph has `{s_1}` (strong) first, then a link gets `{lnk_2}`, not `{lnk_1}`
+   - Always verify the exact ID from debug output, don't assume
+
+3. **Missing whitespace**: Text nodes from markdown-it include spaces between inline elements and text content
    - Example: `{chk_1} Done task` (with space) not `{chk_1}Done task`
+
+4. **Sentence splitting**: `split_sentences()` breaks text into segments that must match the test dictionary exactly
+   - A paragraph like "This is **bold** text. Go to [Google](https://google.com)." becomes two segments:
+     - `"This is {s_1}bold{/s_1} text."`
+     - `"Go to {lnk_2}Google{/lnk_2}."`
+   - The mock engine does exact matching per segment, so test dictionaries must match these splits
+
+5. **Placeholder restoration issues**: `PlaceholderRestorer.normalize_text()` can add unwanted spaces
+   - Closing tags before punctuation should not have spaces: `{/lnk_2}.` not `{/lnk_2} .`
+   - Check `src/mt_server/markdown2/reconstructor/placeholder_restorer.py:66-99` for normalization logic
+
+6. **Reconstruction spacing**: Different block types require different newline handling
+   - Front matter needs `\n\n` after closing `---`
+   - Headings at root level need double newline (not single)
+   - **Top-level lists/tables** need double newline after closing (`ensure_double_newline()`)
+   - **Nested lists** need only single newline (check `stack_size == 0` before adding double newline)
+   - Check `src/mt_server/markdown2/reconstructor/main.py` for `_handle_structural_close` and `_handle_table_structure` logic
+
+7. **Code blocks are NOT translated**: Fence/code_block/math_block have `need_translation=False` in AST walker
+   - Test expectations must preserve original code content
+   - Comments in code are not translated
+
+8. **Code block handler duplication bug**: `code_block_handler.handle_fence()` can write duplicate content if:
+   - Opening fence marker is written without prefix when prefix is needed
+   - Check that all three writes (open fence, code lines, close fence) use the same prefix logic
 
 ## Debugging Procedure
 
@@ -25,7 +54,26 @@ When markdown translation tests fail (especially "not translated" errors), the i
    cd /opt/mt/nllb-server && uv run pytest tests/markdown2/<test_file.py>::<TestClass>::<test_name> -v -s 2>&1
    ```
 
-2. **Create a standalone debug script** to inspect the actual AST walk output:
+2. **Add diagnostic logging to trace buffer state** at key reconstruction points:
+   - In `block_writer.py:write_with_prefix()` - log `line_prefix`, `item_marker`, and buffer tail
+   - In `reconstructor/main.py:_handle_structural_close()` - log buffer after closing lists/tables
+   - In `reconstructor/main.py:_handle_table_structure()` - log buffer after table_close
+   - This reveals exactly what's being written and when spacing issues occur
+
+3. **Inspect the full buffer output**:
+   ```bash
+   uv run pytest tests/markdown2/<test>.py::<test_name> -v -s --log-cli-level=DEBUG 2>&1 | grep "FULL BUFFER" -A 1
+   ```
+   Compare the `repr()` output with expected markdown to spot missing `\n` or extra content.
+
+4. **Check chunker input and merge output** to verify translation flow:
+   ```bash
+   uv run pytest tests/markdown2/<test>.py::<test_name> -v -s --log-cli-level=DEBUG 2>&1 | grep -E "(CHUNKER:|MERGE:)"
+   ```
+   - `CHUNKER:` shows what text is sent for translation (verify placeholders match test dict)
+   - `MERGE:` shows what translations are applied back
+
+5. **Create a standalone debug script** to inspect the actual AST walk output:
    ```python
    from src.mt_server.markdown2.parser import create_markdown_parser
    from markdown_it.tree import SyntaxTreeNode
@@ -46,13 +94,19 @@ When markdown translation tests fail (especially "not translated" errors), the i
                    print(f'  placeholder: mask={ph.tag_mask!r}, strategy={ph.strategy}')
    ```
 
-3. **Match the exact format** in your test's `translation_dict`:
+6. **Match the exact format** in your test's `translation_dict`:
    - Use the exact placeholder prefix shown in the debug output
    - Include any whitespace that appears between placeholders and text
    - The mock engine does exact string matching on segments
+   - **Code blocks**: Don't add translations for code content (it's not translated)
+   - **Fence syntax**: All lines must have `>` prefix when inside blockquote
 
 ## Key Files
 
 - `src/mt_server/markdown2/placeholder.py` - Placeholder generation logic and prefix mapping
 - `src/mt_server/markdown2/handlers/inline_collector.py` - How `extracted_text` is built
+- `src/mt_server/markdown2/reconstructor/main.py` - Spacing logic for lists/tables
+- `src/mt_server/markdown2/reconstructor/block_writer.py` - Buffer write operations with prefixes
+- `src/mt_server/markdown2/reconstructor/code_block_handler.py` - Fence/code block rendering
+- `src/mt_server/markdown2/chunker.py` - Text chunking and translation merging
 - `tests/markdown2/conftest.py` - Mock translation engine implementation

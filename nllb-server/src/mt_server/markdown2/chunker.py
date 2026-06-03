@@ -10,6 +10,8 @@ from .translation_unit import TranslationUnit
 
 logger = logging.getLogger("uvicorn.error")
 
+REC_SEPARATOR = "_割_"
+
 
 @dataclass(slots=True)
 class ChunkSegment:
@@ -31,12 +33,12 @@ class MarkdownChunk:
     def to_plain_text(self) -> str:
         """Собирает все сегменты чанка в единую строку для отправки в модель.
 
-        Использует непечатный ASCII символ \\x1E (Record Separator).
+        Использует непечатный ASCII символ REC_SEPARATOR (Record Separator).
         NLLB гарантированно переносит его без изменений.
         """
         if not self.segments:
             return ""
-        return "\x1e".join(seg.text for seg in self.segments)
+        return REC_SEPARATOR.join(seg.text for seg in self.segments)
 
 
 class MarkdownChunker:
@@ -66,6 +68,11 @@ class MarkdownChunker:
         )
 
         for unit in translatable_units:
+            logger.debug(
+                "CHUNKER: unit_id=%s, extracted_text='%s'",
+                unit.node_id,
+                unit.extracted_text,
+            )
             sentences = split_sentences(unit.extracted_text, self.lang_code)
 
             for sentence in sentences:
@@ -151,7 +158,7 @@ class MarkdownChunker:
         translated_texts: List[str],
         units: List[TranslationUnit],
     ):
-        """Метод обратной сборки (Merger). Точно нарезает ответы по символу \\x1E."""
+        """Метод обратной сборки (Merger). Точно нарезает ответы по символу RECORD_SEPARATOR."""
         unit_map = {u.node_id: u for u in units}
 
         for u in units:
@@ -167,12 +174,19 @@ class MarkdownChunker:
                 logger.warning("  Chunk %d: empty translation response", i + 1)
                 continue
 
-            # Нарезаем строго по непечатному ASCII управляющему разделителю \x1E
-            translated_segments = [s.strip() for s in response_text.split("\x1e")]
+            # Нарезаем строго по непечатному ASCII управляющему разделителю RECORD_SEPARATOR
+            translated_segments = [
+                s.strip() for s in response_text.split(REC_SEPARATOR)
+            ]
 
             if len(translated_segments) == len(chunk.segments):
                 for seg, translated_text in zip(chunk.segments, translated_segments):
                     unit = unit_map[seg.unit_id]
+                    logger.debug(
+                        "MERGE: seg.text='%s' -> translated='%s'",
+                        seg.text,
+                        translated_text,
+                    )
 
                     if unit.translated_text:
                         unit.translated_text += " " + translated_text

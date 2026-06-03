@@ -24,19 +24,20 @@ class TableHandler:
 
     def handle_cell_open(self, unit: TranslationUnit):
         """Обрабатывает открытие ячейки таблицы (th/td).
+        
         Добавляет | перед содержимым ячейки.
         """
-        # Добавляем | и пробел для правильного форматирования таблицы
         self._writer.write_raw("| ")
 
     def handle_cell_close(self, base_type: str):
         """Обрабатывает закрытие ячейки таблицы.
 
-        Добавляет завершающий | для ячейки.
+        Добавляет пробел после содержимого ячейки.
+        Закрывающая | добавляется в handle_tr_close или следующей ячейкой.
         """
         if base_type in ("th", "td"):
-            # Пробел перед | для правильного форматирования таблицы
-            self._writer.write_raw("|")
+            logger.debug("DEBUG TABLE CLOSE: Writing ' ' for %s", base_type)
+            self._writer.write_raw(" ")
 
     def handle_tbody_open(self):
         """Обрабатывает открытие tbody.
@@ -76,9 +77,10 @@ class TableHandler:
     def handle_tr_close(self):
         """Обрабатывает закрытие строки таблицы.
 
-        Гарантирует перенос строки после закрытия строки.
+        Добавляет закрывающую | и перенос строки.
         """
-        self._writer.write_raw("\n")
+        logger.debug("DEBUG TR CLOSE: Writing '|\n'")
+        self._writer.write_raw("|\n")
 
     def handle_thead_open(self):
         """Обрабатывает открытие thead.
