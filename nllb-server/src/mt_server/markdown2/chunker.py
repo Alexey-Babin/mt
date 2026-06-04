@@ -10,7 +10,7 @@ from .translation_unit import TranslationUnit
 
 logger = logging.getLogger("uvicorn.error")
 
-REC_SEPARATOR = "_割_"
+REC_SEPARATOR = " __S__ "
 
 
 @dataclass(slots=True)
@@ -176,7 +176,7 @@ class MarkdownChunker:
 
             # Нарезаем строго по непечатному ASCII управляющему разделителю RECORD_SEPARATOR
             translated_segments = [
-                s.strip() for s in response_text.split(REC_SEPARATOR)
+                s.strip() for s in response_text.split(REC_SEPARATOR.strip())
             ]
 
             if len(translated_segments) == len(chunk.segments):
