@@ -2,6 +2,7 @@ import pytest
 
 # Замените на ваши реальные пути импорта внутри проекта
 from src.mt_server.markdown2.chunker import (
+    REC_SEPARATOR,
     ChunkSegment,
     MarkdownChunk,
     MarkdownChunker,
@@ -88,7 +89,7 @@ def test_create_chunks_basic_greedy_packing(chunker):
     # Проверяем склейку через маркер
     assert (
         chunk.to_plain_text()
-        == "Первое короткое предложение.\x1eВторое предложение документа."
+        == f"Первое короткое предложение.{REC_SEPARATOR}Второе предложение документа."
     )
 
 
@@ -184,8 +185,10 @@ def test_merge_translations_ideal_scenario(chunker):
         ChunkSegment(unit_id="node_2", text="Текст два"),
     ]
 
-    # ИСПРАВЛЕНО: Передаем строку ответа модели, разделенную управляющим символом \x1e
-    translated_response = "Translated text one with |||\x1eTranslated text two"
+    # Передаем строку ответа модели, разделенную REC_SEPARATOR
+    translated_response = (
+        f"Translated text one with |||{REC_SEPARATOR}Translated text two"
+    )
 
     chunker.merge_translations([chunk], [translated_response], [u1, u2])
 
@@ -316,7 +319,9 @@ def test_merge_translations_keeps_empty_segments_preventing_false_fallback(chunk
     ]
 
     # Имитируем ответ модели, где второй сегмент перевелся как пустая строка (два разделителя подряд)
-    translated_response = "Translated one\x1e \x1eTranslated three"
+    translated_response = (
+        f"Translated one{REC_SEPARATOR} {REC_SEPARATOR}Translated three"
+    )
 
     # Запускаем мерж. Если пустая строка отфильтруется, длина станет 2 вместо 3, и включится fallback.
     # Мы проверяем, что отработал идеальный линейный сценарий.

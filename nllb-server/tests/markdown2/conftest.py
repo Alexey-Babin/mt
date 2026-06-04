@@ -46,7 +46,13 @@ class MockTranslationEngine:
         if text in self._translation_dict:
             return self._translation_dict[text]
 
-        segments = [s.strip() for s in text.split("\x1e")]
+        # Разделитель может быть " __S__ " (с пробелами) или "\x1e"
+        if " __S__ " in text:
+            separator = " __S__ "
+        else:
+            separator = "\x1e"
+
+        segments = text.split(separator)
         translated_segments = []
 
         for seg in segments:
@@ -63,7 +69,7 @@ class MockTranslationEngine:
                 if not found:
                     translated_segments.append(seg)
 
-        return "\x1e".join(translated_segments)
+        return separator.join(translated_segments)
 
     def validate_language(self, lang: str) -> None:
         pass
@@ -108,15 +114,41 @@ def mock_engine():
 
 
 @pytest.fixture
-def mock_translator():
+def integration_translation_dict():
+    """Словарь переводов для интеграционного теста full_pipeline."""
+    return {
+        # Полный чанк со всеми сегментами, разделёнными __S__ и плейсхолдерами
+        "Some text before. __S__ This is {s_1}bold{/s_1} text. __S__ Go to {lnk_2}Google{/lnk_2}. __S__ Item 1 __S__ Nested Item 1.1 __S__ Term text __S__ Definition text __S__ Name __S__ Age __S__ John __S__ 30 __S__ Jane __S__ 25 __S__ {chk_1} Done task __S__ {chk_1} Pending task __S__ Some text after.": "Некоторый текст перед. __S__ Это {s_1}жирный{/s_1} текст. __S__ Перейдите на {lnk_2}Google{/lnk_2}. __S__ Элемент 1 __S__ Вложенный элемент 1.1 __S__ Текст термина __S__ Текст определения __S__ Имя __S__ Возраст __S__ Джон __S__ 30 __S__ Джейн __S__ 25 __S__ {chk_1} Выполненная задача __S__ {chk_1} Ожидающая задача __S__ Некоторый текст после.",
+        # Также поддерживаем посегментный перевод (для гибкости)
+        "Some text before.": "Некоторый текст перед.",
+        "This is {s_1}bold{/s_1} text.": "Это {s_1}жирный{/s_1} текст.",
+        "Go to {lnk_2}Google{/lnk_2}.": "Перейдите на {lnk_2}Google{/lnk_2}.",
+        "Item 1": "Элемент 1",
+        "Nested Item 1.1": "Вложенный элемент 1.1",
+        "Term text": "Текст термина",
+        "Definition text": "Текст определения",
+        "Name": "Имя",
+        "Age": "Возраст",
+        "John": "Джон",
+        "30": "30",
+        "Jane": "Джейн",
+        "25": "25",
+        "{chk_1} Done task": "{chk_1} Выполненная задача",
+        "{chk_1} Pending task": "{chk_1} Ожидающая задача",
+        "Some text after.": "Некоторый текст после.",
+    }
+
+
+@pytest.fixture
+def mock_translator(mock_engine, integration_translation_dict):
     """Фикстура для создания переводчика со стабильным лимитом токенов.
 
-    По умолчанию использует лимит 100 токенов. Для изменения используйте
-    параметризованную версию mock_translator_with_limit.
+    По умолчанию использует лимит 100 токенов и словарь переводов для интеграционного теста.
+    Для изменения используйте параметризованную версию mock_translator_with_limit.
     """
 
     def _create_translator(text: str, translation_dict=None):
-        engine = MockTranslationEngine(translation_dict)
+        engine = mock_engine(translation_dict or integration_translation_dict)
         with patch("src.mt_server.markdown2.markdown_translator.max_input_tokens", 100):
             return MarkdownTranslator(
                 text=text,
@@ -129,11 +161,11 @@ def mock_translator():
 
 
 @pytest.fixture
-def mock_translator_with_limit():
+def mock_translator_with_limit(mock_engine):
     """Фикстура для создания переводчика с кастомным лимитом токенов."""
 
     def _create_translator(text: str, max_tokens: int, translation_dict=None):
-        engine = MockTranslationEngine(translation_dict)
+        engine = mock_engine(translation_dict)
         with patch(
             "src.mt_server.markdown2.markdown_translator.max_input_tokens", max_tokens
         ):
