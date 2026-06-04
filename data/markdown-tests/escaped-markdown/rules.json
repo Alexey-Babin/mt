@@ -1,0 +1,5 @@
+{
+  "preserve_escapes": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

@@ -1,0 +1,4 @@
+- Never guess the root cause of an error. Always treat bug fixing as a scientific investigation.
+- Use terminal execution tools to run tests, print logs, or reproduce the bug before changing any code.
+- Utilize your built-in reasoning tokens combined with the `sequential-thinking` tool to trace variables and state changes step-by-step.
+- Once the bug is fixed, explicitly run the project's test suite or build command via the terminal to prove to the user that the fix is successful and hasn't broken other parts of the application.

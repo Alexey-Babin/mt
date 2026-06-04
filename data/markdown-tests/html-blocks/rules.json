@@ -1,0 +1,6 @@
+{
+  "preserve_html_blocks": true,
+  "preserve_raw_html": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

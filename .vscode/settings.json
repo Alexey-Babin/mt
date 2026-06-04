@@ -1,5 +1,22 @@
 {
-  "cSpell.words": ["Nllb"],
+  "cSpell.words": ["Nllb", "Reconstructor", "комплаенса"],
+  "dotenv.enableAutocloaking": false,
   "python.defaultInterpreterPath": "${workspaceFolder}/nllb-server/.venv/bin/python",
-  "python.analysis.extraPaths": ["${workspaceFolder}/nllb-server"]
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/nllb-server/src",
+    "./nllb-server"
+  ],
+  "python.testing.pytestArgs": [
+    "tests/",
+    "-vv",
+    "--log-cli-level=DEBUG",
+    "--log-format=\"%(asctime)s %(levelname)s %(name)s: %(message)s\"",
+    "--log-date-format=\"%Y-%m-%d %H:%M:%S\""
+  ],
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestPath": "${workspaceFolder}/nllb-server/.venv/bin/pytest",
+  "python.testing.cwd": "${workspaceFolder}/nllb-server",
+
+  "python.envFile": "${workspaceFolder}/nllb-server/.env.test",
+  "wolf.disableHotModeWarning": true
 }

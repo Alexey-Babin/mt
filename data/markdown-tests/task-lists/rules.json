@@ -1,0 +1,7 @@
+{
+  "preserve_task_lists": true,
+  "preserve_list_structure": true,
+  "preserve_checkboxes": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

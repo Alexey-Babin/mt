@@ -1,0 +1,5 @@
+{
+  "handle_malformed_input": true,
+  "compare_ast_structure": false,
+  "strict_text_equality": false
+}

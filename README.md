@@ -1,44 +1,99 @@
-## Nachine Translation
+Machine translating systems
 
-Собираем систему машинного перевода. Основной язык - русский. Перевод на русский, английский, вьетнамский, монгольский.
-Система развернута полностью on-premises, без использования облачных сервисов.
-Система многопользовательская, web. Аутентификация - ?? (для начала - username/password или jwt, на следующих этапах - ldap)
-Делается на двух серверах.
+Languages: EN + member countries (Russia, Mongolia, Vietnam, Cuba) + former member countries (Hungary, Romania, Bulgaria, Czech, Slovakia ). Other languages also may be available.
 
+System works TOTALLY on-premises, no cloud services.
 
-|            | pc001           | pc002                      |
-| ---------- | --------------- | -------------------------- |
-| Назначение | Инференс модели | пользовательский интерфейс |
-|            | dedicated PC    | HyperV VM                  |
-| hostname   | pc001           | pc002                      |
-| ip         | 195.168.33.129  | 195.168.33.45              |
-| CPU        | Core i5 8 cores | 4 virtual processor        |
-| RAM        | 8G              | 4G                         |
-| Videocard  | Nvidia 3070     | -                          |
-| OS         | Debian 13.4     | Debian 13.4                |
-На обоих машинах установлен Docker. Если на хосте используем Python, то через uv.
+Система многопользовательская, web. 
+
+Делается на двух серверах. Третий сервер внутри сетевого периметра - к нему только подключаемся, out of project scope/.
+
+|              | pc001           | pc002                                | pc003                          |
+| ------------ | --------------- | ------------------------------------ |------------------------------- |
+| Назначение   | Backend,        |                                      | LLAMA.cpp with LLMs 
+|              | NLLB Inference  | пользовательский интерфейс, frontend | 
+| machine type | dedicated PC    | HyperV VM                            |
+| hostname     | pc001           | pc002                                |
+| ip           | 195.168.33.129  | 195.168.33.45                        |
+| CPU          | Core i5 8 cores | 4 virtual processor                  |
+| RAM          | 8G              | 4G                                   |
+| Videocard    | Nvidia 3070     | -                                    |
+| OS           | Debian 13.4     | Debian 13.4                          |
+
+На pc001 установлен Docker. Для взаимодействия с python используем uv, even inside Docker containers.
 
 ## Архитектура:
 ### pc001
-NLLB inference сервер, в своём контейнере. Взаимодействие с ним через API (реализация на FastAPI)
+Backend.
+There should be options:
+	- NLLB inference right on pc001
+	- Interaction with LLM on LLAMA.c
 Стек:
 - Python 3.12
 - Менеджер пакетов `uv`
 - API `FastAPI`
-- Библиотеки: `PyTorch`, `transformers`, `accelerate`
+- Библиотеки: see in file nllb-server/pyproject.toml
 
-Для перевода будем модель `facebook/nllb-200-distilled-300M`. Когда RAM будет больше, поменяем модель на `facebook/nllb-200-distilled-600M` или `facebook/nllb-200-distilled-1.3B`
+Для перевода будем модель `facebook/nllb-200-distilled-600M`. Когда RAM будет больше, поменяем модель на `facebook/nllb-200-distilled-1.3B` или другую.
+Следует предусмотреть возможность осуществления перевода на третьей машине с llama.cpp - на следующих этапах
+
+ВАЖНО: нужно иметь возможность сохранять форматирование исходного текста. Формат - только Markdown, этого достаточно. IN NEXT RELEASES: should be a possibility to convert input file to MD -> translate. Maybe using of `pandoc` or `microsoft/markdown` makes sense to convert to MD and back.
 
 **Сервер**
-Сервер самописный на python, внутри контейнера. Endpoints:
-- POST /translate
-- GET /health
-- GET /languages
+Сервер пишем на на python. Используем FastAPI. Прод работает внутри контейнера. Отладка напрямую
 
-**Оптимизации:**
-- `batch_size=1` (интерактив), `torch.inference_mode()`
-*  Использовать `torch.compile` (PyTorch 2.0+)
-- При необходимости добавить `bitsandbytes` 8-bit (снизит качество на 1-2 BLEU, но сэкономит память)
+Endpoints:
+1. POST /translate 
+Input:
+	- text to be translated,
+	- source language,
+	- target language,
+	- preserve format (MD) - optional. System detects wether MD or raw text
+	- response in stream or in single chunk - IN NEXT RELEASES
+Output:
+	- translated text
+	- stats (words, paragraphs, tokens...) - IN NEXT RELEASES
+
+2. GET /health
+Output:
+	- Is server up and running
+	- Use GPU
+	- Model
+
+3. GET /languages
+Input:
+	- Which languages we are using: 
+		* member countries + EN (ENG, RUS, MNG, VIE, CUB), 
+		* member and former member countries (+ HUN, ROM, CZK, SK, ...)
+		* all
+Output:
+	List of languages in EN, RU, ISO, NLLB code.
 
 ### pc002
-- Nginx, FastApi, что-то ещё - на следующих этапах
+- Nginx, FastApi, что-то ещё - NEXT STAGES
+
+## Этапы работы:
+
+1. **Этап 1 (базовый):**
+    - настроить среду разработки (done)
+	- настроить среду тестирования (done, но надо добавить работу с плагином vs code)
+    - написать сервер (базовый api):
+	    - GET /health (состояние сервера, доступность gpu)
+	    - GET /languages (список языков в формате nllb / человеческом. Приоритетные - наверху)
+	    - POST /translate (plain text, no http stream, no statistics) - done
+	На первом этапе система без оптимизаций.
+
+2. **Этап 2 (Chunking):**
+	- Разбивка текста на чанки (строки/абзацы/предложения/слова). Выбор оптимального чанка для передачи в модель (done)
+
+3. **Этап 3 (Поддержка форматирования):**
+	- добавляем параметр к методу POST /translate (preserve format)
+	- Работа с исходным текстом:
+	  * запомнить структуру
+	  * Выделить **ТОЛЬКО ТЕКСТ, ПОДЛЕЖАЩИЙ ПЕРЕВОДУ**, 
+	  * Перевести все куски текста _с максимальным сохранением контекста_, с учетом разбивки на части как в предыдущем этапе
+	  * Собрать структуру обратно
+	  * преобразовать опять в md
+	  * отправить потребителю
+
+	Допускается использование как библиотек, так и стороннего ПО (предложи)

@@ -1,0 +1,8 @@
+{
+  "preserve_heading_levels": true,
+  "preserve_inline_formatting": true,
+  "preserve_links": true,
+  "preserve_inline_code": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

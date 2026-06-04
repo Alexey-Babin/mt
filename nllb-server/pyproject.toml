@@ -6,10 +6,17 @@ requires-python = ">=3.12"
 dependencies = [
     "accelerate>=1.13.0",
     "fastapi>=0.136.1",
+
     "markdown-it-py>=3.0.0",
     "mdformat>=1.0.0",
     "mdit-py-plugins>=0.4.0",
+    "markdown>=3.10.2",
+    "markdown-it-py>=4.2.0",
+    "mdit-py-plugins>=0.6.1",
+    "pydantic>=2.13.4",
+    "pypandoc>=1.17",
     "pysbd>=0.3.4",
+    "pyyaml>=6.0.3",
     "regex>=2026.5.9",
     "torch>=2.12.0",
     "transformers>=5.8.1",
@@ -19,4 +26,34 @@ dependencies = [
 [dependency-groups]
 dev = [
     "debugpy>=1.8.20",
+    "lxml>=6.1.1",
+    "markdown-it-py>=4.2.0",
+    "pydantic>=2.13.4",
+    "pytest>=9.0.3",
+    "rich>=15.0.0",
+    "ruff>=0.15.14",
+    "setuptools>=81.0.0",
 ]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+log_cli = true
+log_cli_level = "DEBUG"
+log_cli_format = "%(levelname)s - %(name)s - %(message)s"
+log_cli_date_format = "%H:%M:%S"
+
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+
+[tool.ruff]
+src = ["src"]

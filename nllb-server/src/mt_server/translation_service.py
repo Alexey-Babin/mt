@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+import logging
+from typing import Optional
+
+from .engine import TranslationEngineProtocol
+from .format_detection import TextFormat, looks_like_markdown
+from .handlers import FormatHandler, MarkdownHandler, PlainHandler
+
+logger = logging.getLogger("uvicorn.error")
+
+
+class TranslationService:
+    """Служба перевода - определение формата входных данных, выбор специализированного переводчика"""
+
+    def __init__(self, engine: TranslationEngineProtocol):
+        self.engine = engine
+        self._handlers: dict[TextFormat, FormatHandler] = {
+            TextFormat.PLAIN: PlainHandler(),
+            TextFormat.MARKDOWN: MarkdownHandler(),
+        }
+
+    def translate(
+        self,
+        text: str,
+        src_lang: str,
+        tgt_lang: str,
+        format: Optional[TextFormat] = TextFormat.AUTO,
+    ) -> str:
+
+        if not text.strip():
+            return text
+
+        if format == TextFormat.AUTO or not format:
+            actual_format = self._resolve_format(
+                text=text,
+                format=format,
+            )
+            logger.info(
+                f"Detected format: {actual_format.value} for translation {src_lang}->{tgt_lang}"
+            )
+        else:
+            actual_format = format
+            logger.info(
+                f"Using format: {actual_format.value} for translation {src_lang}->{tgt_lang}"
+            )
+        try:
+            handler = self._handlers.get(actual_format)
+            if handler:
+                return handler.handle(text, src_lang, tgt_lang, self.engine)
+            raise ValueError(f"Unknown format: {actual_format}")
+        except Exception as e:
+            logger.error(f"Translation service error: {e}", exc_info=True)
+            # Fallback: пробуем перевести как plain text, чтобы не возвращать ошибку пользователю
+            if actual_format == TextFormat.MARKDOWN:
+                logger.warning(
+                    "Falling back to plain text translation due to Markdown processing error."
+                )
+                from .plain_text_translator import PlainTextTranslator
+
+                translator = PlainTextTranslator(
+                    text=text,
+                    src_lang=src_lang,
+                    target_lang=tgt_lang,
+                    engine=self.engine,
+                )
+                return translator.process()
+            raise
+
+    @staticmethod
+    def _resolve_format(
+        text: str,
+        format: Optional[TextFormat],
+    ) -> TextFormat:
+        match format:
+            case TextFormat.PLAIN:
+                return TextFormat.PLAIN
+
+            case TextFormat.MARKDOWN:
+                return TextFormat.MARKDOWN
+
+            case TextFormat.AUTO:
+                if looks_like_markdown(text):
+                    return TextFormat.MARKDOWN
+
+                return TextFormat.PLAIN
+
+            case _:
+                return TextFormat.PLAIN

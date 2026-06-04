@@ -1,0 +1,5 @@
+{
+  "handle_whitespace_only": true,
+  "preserve_whitespace": true,
+  "output_must_match_input": true
+}

@@ -1,0 +1,7 @@
+{
+  "preserve_blockquotes": true,
+  "preserve_nesting": true,
+  "preserve_lists_inside_quotes": true,
+  "compare_ast_structure": true,
+  "strict_text_equality": false
+}

@@ -7,7 +7,7 @@
             
             "module": "uvicorn",
 
-            "args": ["main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
+            "args": ["mt_server.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
             "cwd": "${workspaceFolder}/nllb-server",
             "env": {
                 "PYTHONBUFFERED": "1",
