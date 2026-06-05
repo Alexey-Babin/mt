@@ -31,12 +31,27 @@
 │   │   │   ├── plain_text_translator.py # Перевод plain text
 │   │   │   ├── languages.py    # Список языков
 │   │   │   ├── markdown2/      # Подсистема перевода Markdown (текущая работа)
-│   │   │   │   ├── parser.py          # Парсинг MD в AST
-│   │   │   │   ├── ast_walker.py      # Обход дерева
-│   │   │   │   ├── chunker.py         # Разбивка на чанки
-│   │   │   │   ├── markdown_translator.py  # Оркестратор
-│   │   │   │   ├── handlers/          # Обработчики узлов AST
-│   │   │   │   └── reconstructor/     # Сборка MD обратно из перевода
+│   │   │   │   ├── __init__.py            # Точка входа, экспорт MarkdownTranslator
+│   │   │   │   ├── parser.py              # Парсинг MD в AST (markdown-it-py)
+│   │   │   │   ├── translator.py          # Оркестратор всего пайплайна
+│   │   │   │   ├── chunker.py             # Разбиение на чанки и merge
+│   │   │   │   ├── models/                # Общие модели данных
+│   │   │   │   │   ├── translation_unit.py
+│   │   │   │   │   ├── translation_unit_type.py
+│   │   │   │   │   ├── placeholder.py
+│   │   │   │   │   ├── placeholder_codes.py  # Словарь кодов плейсхолдеров
+│   │   │   │   │   ├── node_type.py
+│   │   │   │   │   └── unit_factory.py
+│   │   │   │   ├── ast_walker/            # Обход AST-дерева
+│   │   │   │   │   ├── walker.py
+│   │   │   │   │   └── handlers/          # Обработчики узлов AST
+│   │   │   │   └── reconstructor/         # Сборка MD обратно из перевода
+│   │   │   │       ├── main.py
+│   │   │   │       ├── state_machine.py
+│   │   │   │       ├── block_writer.py
+│   │   │   │       ├── placeholder_restorer.py
+│   │   │   │       ├── code_block_handler.py
+│   │   │   │       └── table_handler.py
 │   │   │   └── ...
 │   │   └── mt_client/          # Клиент (пусто, заглушка)
 │   ├── tests/                  # Тесты, зеркалят структуру src
@@ -102,4 +117,17 @@ docker compose up --build -d
 
 ## Текущая работа
 
-Ветка `markdown-2` — разработка подсистемы сохранения Markdown-форматирования при переводе. Пайплайн: парсинг MD → AST → извлечение текста → перевод → реконструкция MD.
+Ветка `markdown-2` — разработка подсистемы сохранения Markdown-форматирования при переводе.
+
+**Пайплайн:** парсинг MD → AST → извлечение текста → перевод → реконструкция MD.
+
+**Ключевая концепция:** Система плейсхолдеров (dunder-формат `__X_O_N__`) защищает Markdown-разметку от перевода NLLB.
+
+**Документация:**
+- `documents/markdown2_context.md` — подробное описание архитектуры, требований и правил
+- `plans/refactoring_markdown2_plan.md` — план рефакторинга модуля
+
+**Статус рефакторинга:**
+- ✅ Фаза 0-0d: Выполнены (структура, оркестратор, плейсхолдеры)
+- ⏳ Фаза 1: Устранение циклических зависимостей (в ожидании)
+- ⏳ Фаза 2-7: Консолидация и оптимизация (в ожидании)

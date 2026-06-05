@@ -74,20 +74,26 @@ def test_reconstruct_heading(reconstructor):
 
 def test_reconstruct_inline_formatting_strong(reconstructor):
     """Тест восстановления парной инлайн-разметки (жирный шрифт)."""
-    # Создаем моки плейсхолдеров
+    # Создаем моки плейсхолдеров в dunder-формате
     ph_open = MagicMock(
-        tag_mask=" {s_1} ",
+        id=1,
+        tag_mask="__B_O_1__",
         strategy="INLINE_TRANSLATE",
         node_type="strong_open",
         original_markup="**",
         is_closing=False,
+        has_leading_space=True,
+        has_trailing_space=False,
     )
     ph_close = MagicMock(
-        tag_mask=" {/s_1} ",
+        id=1,
+        tag_mask="__B_C_1__",
         strategy="INLINE_TRANSLATE",
         node_type="strong_close",
         original_markup="",
         is_closing=True,
+        has_leading_space=False,
+        has_trailing_space=True,
     )
 
     u1 = TranslationUnit(
@@ -95,8 +101,8 @@ def test_reconstruct_inline_formatting_strong(reconstructor):
         node_type="paragraph",
         unit_type=TranslationUnitType.CONTEXT_BLOCK,
         original_text="This is **bold** text.",
-        extracted_text="This is {s_1}bold{/s_1} text.",
-        translated_text="Это {s_1}жирный{/s_1} текст.",
+        extracted_text="This is __B_O_1__ bold __B_C_1__  text.",
+        translated_text="Это __B_O_1__ жирный __B_C_1__  текст.",
         need_translation=True,
         placeholders=[ph_open, ph_close],
     )
@@ -119,27 +125,33 @@ def test_reconstruct_links_and_images(reconstructor):
     """Тест восстановления ссылок и картинок из словарей атрибутов."""
     ph_link_open = MagicMock(
         id=1,
-        tag_mask=" {lnk_1} ",
+        tag_mask="__L_O_1__",
         strategy="INLINE_TRANSLATE",
         node_type="link_open",
         original_markup={"href": "https://google.com", "title": ""},
         is_closing=False,
+        has_leading_space=True,
+        has_trailing_space=False,
     )
     ph_link_close = MagicMock(
         id=1,
-        tag_mask=" {/lnk_1} ",
+        tag_mask="__L_C_1__",
         strategy="INLINE_TRANSLATE",
         node_type="link_close",
         original_markup="",
         is_closing=True,
+        has_leading_space=False,
+        has_trailing_space=True,
     )
     ph_img = MagicMock(
         id=2,
-        tag_mask=" {img_2} ",
+        tag_mask="__G_2__",
         strategy="INLINE_TRANSLATE",
         node_type="image",
-        original_markup={"src": "logo.png", "title": "Logo"},
+        original_markup={"src": "logo.png", "title": "Logo", "alt": "Альтернативный текст"},
         is_closing=False,
+        has_leading_space=True,
+        has_trailing_space=True,
     )
 
     u1 = TranslationUnit(
@@ -147,8 +159,8 @@ def test_reconstruct_links_and_images(reconstructor):
         node_type="paragraph",
         unit_type=TranslationUnitType.CONTEXT_BLOCK,
         original_text="Go to [Google](https://google.com) and see ![logo](logo.png 'Logo')",
-        extracted_text="Go to {lnk_1}Google{/lnk_1} and see {img_2}",
-        translated_text="Перейдите в {lnk_1}Google{/lnk_1} и посмотрите на {img_2}",
+        extracted_text="Go to __L_O_1__ Google __L_C_1__  and see __G_2__ ",
+        translated_text="Перейдите в __L_O_1__ Google __L_C_1__  и посмотрите на __G_2__ ",
         need_translation=True,
         placeholders=[ph_link_open, ph_link_close, ph_img],
     )

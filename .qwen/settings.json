@@ -1,54 +1,42 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(python *)",
-      "Bash(which *)",
-      "Bash(uv *)",
-      "Bash(docker *)",
-      "Bash(git *)",
-      "Bash(cat *)",
-      "Bash(ls *)",
-      "Bash(pwd)",
-      "Bash(env)",
-      "Bash(nvidia-smi)",
-      "Agent(Explore)",
-      "Bash(mkdir *)"
+  "tools": {
+    "approvalMode": "default",
+    "allowed": [
+      "run_shell_command(python *)",
+      "run_shell_command(uv *)",
+      "run_shell_command(nvidia-smi)",
+      "run_shell_command(git *)"
     ]
   },
-  "$version": 4,
   "mcpServers": {
     "context7": {
-      "type": "streamable-http",
-      "httpUrl": "https://context7.com",
+      "httpUrl": "https://mcp.context7.com/mcp",
       "headers": {
-        "CONTEXT7_API_KEY": "ctx7sk-9ea6c694-893d-4b37-8437-b7b644f7cbe8"
+        "CONTEXT7_API_KEY": "ctx7sk-fb1763dd-7f51-437d-ad65-4bbfd9083ddf",
+        "Accept": "application/json, text/event-stream"
       },
-      "alwaysAllow": [
-        "query-docs"
-      ]
+      "includeTools": ["query-docs"]
     },
+
     "sequential-thinking": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ],
-      "alwaysAllow": [
-        "sequentialthinking"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "includeTools": ["sequentialthinking"]
     },
-    "memory": {
+    "filesystem": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ],
-      "alwaysAllow": [
-        "search_nodes",
-        "create_nodes",
-        "add_relations",
-        "read_graph"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "includeTools": ["read_file", "search_files", "write_file"]
+    },
+
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git"],
+      "includeTools": ["git_status", "git_diff", "git_log"]
     }
+  },
+  "$version": 4,
+  "mcp": {
+    "excluded": []
   }
 }

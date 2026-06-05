@@ -6,11 +6,10 @@ import regex as re
 
 from mt_server.utils import count_tokens, split_sentences
 
+from .models.placeholder_codes import SEGMENT_SEPARATOR
 from .models.translation_unit import TranslationUnit
 
 logger = logging.getLogger("uvicorn.error")
-
-REC_SEPARATOR = " __S__ "
 
 
 @dataclass(slots=True)
@@ -33,12 +32,12 @@ class MarkdownChunk:
     def to_plain_text(self) -> str:
         """Собирает все сегменты чанка в единую строку для отправки в модель.
 
-        Использует непечатный ASCII символ REC_SEPARATOR (Record Separator).
+        Использует SEGMENT_SEPARATOR (__S__) из placeholder_codes.
         NLLB гарантированно переносит его без изменений.
         """
         if not self.segments:
             return ""
-        return REC_SEPARATOR.join(seg.text for seg in self.segments)
+        return SEGMENT_SEPARATOR.join(seg.text for seg in self.segments)
 
 
 class MarkdownChunker:
@@ -174,9 +173,9 @@ class MarkdownChunker:
                 logger.warning("  Chunk %d: empty translation response", i + 1)
                 continue
 
-            # Нарезаем строго по непечатному ASCII управляющему разделителю RECORD_SEPARATOR
+            # Нарезаем строго по разделителю сегментов SEGMENT_SEPARATOR
             translated_segments = [
-                s.strip() for s in response_text.split(REC_SEPARATOR.strip())
+                s.strip() for s in response_text.split(SEGMENT_SEPARATOR.strip())
             ]
 
             if len(translated_segments) == len(chunk.segments):

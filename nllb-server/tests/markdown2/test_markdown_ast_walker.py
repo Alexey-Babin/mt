@@ -76,8 +76,8 @@ def test_walk_paragraph_with_inline_formatting(walker):
     p_unit = units[0]
 
     assert p_unit.original_text == "Это **важно"
-    # Маска должна быть чистой, без лишних пробелов на стыке с кириллицей ({s_1})
-    assert p_unit.extracted_text == "Это {s_1}важно{/s_1}"
+    # Маска должна быть в dunder-формате (__B_O_1__ ... __B_C_1__) с пробелами вокруг
+    assert p_unit.extracted_text == "Это __B_O_1__ важно __B_C_1__ "
     assert len(p_unit.placeholders) == 2  # strong_open и strong_close
 
 

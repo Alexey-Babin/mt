@@ -18,98 +18,6 @@
 
 ---
 
-## Структурная реорганизация модуля
-
-### Проблема
-
-На верхнем уровне `markdown2/` — россыпь из 9 файлов без понятной логики:
-
-```
-markdown2/                          # 9 файлов на верхнем уровне — каша
-├── __init__.py
-├── ast_walker.py              ← этап 2
-├── chunker.py                 ← этап 3+5
-├── translator.py              ← оркестратор (бывший markdown_translator.py)
-├── node_type.py               ← общая модель
-├── parser.py                  ← этап 1
-├── placeholder.py             ← общая модель
-├── translation_unit.py        ← общая модель
-├── translation_unit_type.py   ← общая модель
-├── unit_factory.py            ← общая модель
-├── handlers/                  ← этап 2 (но оторван от ast_walker.py)
-└── reconstructor/             ← этап 6 (уже подмодуль — хорошо)
-```
-
-### Принцип группировки
-
-Файл принадлежит подмодулю, если он используется **только** одним этапом пайплайна. Файлы, используемые двумя и более этапами — в `models/`.
-
-| Группа | Что входит | Логика |
-|---|---|---|
-| **ast_walker/** | `ast_walker.py` + `handlers/*` | Всё обслуживает обход AST. Handlers не нужны никому, кроме walker |
-| **reconstructor/** | `main.py` + компоненты | Уже подмодуль. Все файлы — сборка MD |
-| **models/** | `translation_unit.py`, `translation_unit_type.py`, `node_type.py`, `placeholder.py`, `unit_factory.py` | Модели данных и типы, используются на ≥2 этапах |
-| Верхний уровень | `translator.py`, `parser.py`, `chunker.py` | Оркестратор, парсер, чанкер — каждый самодостаточен и мал |
-
-### Целевая структура
-
-```
-markdown2/
-├── __init__.py                        # public API: MarkdownTranslator
-├── translator.py                      # оркестратор (~100 строк после рефакторинга)
-├── parser.py                          # создание парсера (32 строки)
-├── chunker.py                         # нарезка + merge + fallback (~300 строк)
-│
-├── ast_walker/                        # этап 2: обход AST
-│   ├── __init__.py                    # экспорт ASTWalker
-│   ├── walker.py                      # DFS-обход (бывший ast_walker.py)
-│   └── handlers/
-│       ├── __init__.py
-│       ├── base.py                    # протокол NodeHandler
-│       ├── context_block_handler.py
-│       ├── structural_block_handler.py
-│       ├── special_case_handler.py
-│       └── inline_collector.py
-│
-├── reconstructor/                     # этап 6: сборка MD (уже существует)
-│   ├── __init__.py
-│   ├── main.py
-│   ├── state_machine.py
-│   ├── block_writer.py
-│   ├── block_handlers.py              # CodeBlockHandler + TableHandler
-│   └── placeholder_restorer.py
-│
-└── models/                            # общие модели данных (≥2 потребителя)
-    ├── __init__.py                    # реэкспорт всех моделей
-    ├── translation_unit.py            # TranslationUnit dataclass
-    ├── translation_unit_type.py       # TranslationUnitType enum
-    ├── node_type.py                   # маппинг типов AST-узлов
-    ├── placeholder.py                 # Placeholder dataclass + PlaceholderManager
-    └── unit_factory.py               # фабрика юнитов
-```
-
-### Миграция импортов
-
-Было (относительные импорты в одном каталоге):
-```python
-# в ast_walker.py
-from .translation_unit import TranslationUnit
-from .placeholder import PlaceholderManager
-from .handlers import ContextBlockHandler
-```
-
-Станет (модели — на уровень выше, walker — внутри ast_walker/):
-```python
-# в ast_walker/walker.py
-from ..models.translation_unit import TranslationUnit
-from ..models.placeholder import PlaceholderManager
-from .handlers import ContextBlockHandler
-```
-
-### Почему `chunker.py` НЕ подмодуль
-
-Chunker — один файл (~263 строки). С будущим `chunker_fallback.py` (~50 строк) — итого ~310 строк. Два файла не требуют подмодуля: лишний `__init__.py` и уровень вложенности без реальной пользы.
-
 ---
 
 ## ~~Анализ `markdown_translator.py` — пайплайн `process()`~~ ✅ РЕШЕНО
@@ -147,6 +55,48 @@ Chunker — один файл (~263 строки). С будущим `chunker_fa
 6. ~~**Неправильный импорт** — `reconstructor/main.py` использует `from src.mt_server.config`~~ ✅ исправлено (Фаза 0)
 7. ~~**Сырая реализация Шага 4** в `process()` — цикл перевода чанков inline~~ ✅ исправлено (Фаза 0b)
 8. ~~**Глобальная переменная** `max_input_tokens` на уровне модуля~~ ✅ исправлено (Фаза 0b)
+9. ~~**Россыпь файлов** на верхнем уровне (9 файлов без логики группировки)~~ ✅ исправлено (Фаза 0c)
+10. ~~**Плейсхолдеры прилипают к тексту** — NLLB воспринимает `__B_O_1__текст__B_C_1__` как единое слово~~ ✅ исправлено (пробелы вокруг плейсхолдеров)
+11. ~~**Хардкод разделителя** `REC_SEPARATOR = " __S__ "` в `chunker.py` без связи со словарём плейсхолдеров~~ ✅ исправлено (`SEGMENT_SEPARATOR` в `placeholder_codes.py`)
+
+---
+
+## Текущая структура модуля (после Фазы 0c)
+
+```
+markdown2/
+├── __init__.py                        # public API: MarkdownTranslator
+├── translator.py                  (140) — оркестратор, ✅ очищен
+├── parser.py                       (32) — ✅ без проблем
+├── chunker.py                     (263) — SRP нарушен: упаковка + merge + fallback
+│
+├── ast_walker/                        # этап 2: обход AST
+│   ├── __init__.py                    # экспорт ASTWalker
+│   ├── walker.py                  (129) — God Object, tight coupling с handlers
+│   └── handlers/
+│       ├── __init__.py
+│       ├── context_block_handler.py (241) — самый большой handler, дублирование
+│       ├── structural_block_handler.py (182) — дублирует _PARSED_STRUCTURAL_BLOCKS
+│       ├── special_case_handler.py   (69) — over-engineering для одного типа
+│       └── inline_collector.py      (138) — лезет в ContextBlockHandler
+│
+├── reconstructor/                     # этап 6: сборка MD
+│   ├── __init__.py
+│   ├── main.py                  (357) — God Object, два пути для таблиц
+│   ├── state_machine.py         (170) — getter с побочными эффектами
+│   ├── block_writer.py          (105) — табличные методы не по адресу
+│   ├── code_block_handler.py     (64) — дублирование if/else
+│   ├── placeholder_restorer.py  (275) — O(n*m) нормализация, regex в методах
+│   └── table_handler.py          (97) — мёртвые методы, фиктивные блоки в стеке
+│
+└── models/                            # общие модели данных
+    ├── __init__.py                    # реэкспорт всех моделей
+    ├── translation_unit_type.py  (16) — ✅ без проблем
+    ├── translation_unit.py       (41) — данные смешаны с состоянием pipeline
+    ├── node_type.py              (116) — дублирование множеств, сложная инициализация
+    ├── unit_factory.py            (91) — namespace class (все методы статические)
+    └── placeholder.py            (188) — 3 ответственности в одном классе
+```
 
 ---
 
@@ -189,6 +139,55 @@ Chunker — один файл (~263 строки). С будущим `chunker_fa
   - ~~Все тестовые импорты (8 файлов)~~ ✅
 - Тесты: **86 passed** (62 markdown2 + 24 service) ✅
 - Линтер: **All checks passed!** ✅
+
+---
+
+### ~~Фаза 0d: Рефакторинг системы плейсхолдеров~~ ✅ ВЫПОЛНЕНА
+
+> ~~**Критично для production**: текущий формат `{lnk_1}` воспринимается NLLB как слово для перевода.~~
+
+**Реализовано:**
+
+- ~~0d.1. Создать `models/placeholder_codes.py`~~ ✅
+  - Словари `PAIRED_CODES`, `SINGLE_TRANSLATE_CODES`, `PROTECT_CODES`
+  - Функции `get_code()`, `format_placeholder()`, `is_paired_type()`
+  - Полный охват всех типов узлов из markdown-it-py и плагинов
+
+- ~~0d.2. Новый формат плейсхолдеров~~ ✅
+  - Старый: `{lnk_1}`, `{/lnk_1}`, `{s_1}`, `{code_1}`
+  - Новый: `__L_O_1__`, `__L_C_1__`, `__B_O_1__`, `__C_1__`
+  - Dunder-формат явно не является словом для NLLB
+
+- ~~0d.3. Обновить `Placeholder` dataclass~~ ✅
+  - Добавлены поля `has_leading_space` и `has_trailing_space`
+  - Позволяет сохранять контекст пробелов для корректного восстановления
+
+- ~~0d.4. Обновить `PlaceholderManager.create_placeholder()`~~ ✅
+  - Использует `get_code()` из `placeholder_codes.py`
+  - Генерирует маски в dunder-формате
+  - Принимает параметры `has_leading_space` / `has_trailing_space`
+
+- ~~0d.5. Обновить `PlaceholderRestorer`~~ ✅
+  - Новые regex для `__X_Y_N__` формата
+  - Умная нормализация текста с учетом пунктуации
+  - Корректное восстановление парных и атомарных тегов
+
+- ~~0d.6. Обновить тесты плейсхолдеров~~ ✅
+  - `test_markdown_placeholder_manager.py` - 10 тестов
+  - `test_markdown_reconstructor.py` - 2 теста
+  - `test_markdown_ast_walker.py` - 1 тест
+  - `test_markdown_elements.py` - 5 тестов
+  - `test_markdown_integration.py` - 1 тест
+  - `conftest.py` - `integration_translation_dict`
+
+**Результаты:**
+- Все 65 тестов markdown2 проходят ✅
+- Все 24 теста service проходят ✅
+- Линтер: All checks passed! ✅
+
+**Преимущества**:
+- Тесты импортируют тот же словарь — нет дублирования
+- Легко расширять (одна строка на новый тип)
 
 ---
 
@@ -377,14 +376,16 @@ markdown2/
 |---|---|---|---|---|
 | 1 | Фаза 0 — Подготовительная | Нулевой | Нет | ✅ Выполнена |
 | 2 | Фаза 0b — Очистка оркестратора | Нулевой | Нет | ✅ Выполнена |
-| 3 | Фаза 0c — Структурная реорганизация | Низкий | Фаза 0b | Ожидает |
-| 4 | Фаза 3 — Упрощение `node_type.py` | Низкий | Фаза 0c | Ожидает |
-| 5 | Фаза 1 — Устранение циклических зависимостей | Средний | Фаза 0c | Ожидает |
-| 6 | Фаза 2 — Консолидация дублирования | Средний | Фаза 1 | Ожидает |
-| 7 | Фаза 4 — Упрощение мелких модулей | Низкий | Фаза 1 | Ожидает |
-| 8 | Фаза 5 — Рефакторинг reconstructor | Средний | Фаза 2 | Ожидает |
-| 9 | Фаза 6 — Улучшение PlaceholderManager | Низкий | Фаза 4 | Ожидает |
-| 10 | Фаза 7 — Оптимизация Chunker | Низкий | Фаза 4 | Ожидает |
+| 3 | Фаза 0c — Структурная реорганизация | Низкий | Фаза 0b | ✅ Выполнена |
+| 4 | **Фаза 0d — Рефакторинг плейсхолдеров** | **Средний** | **Фаза 0c** | ✅ Выполнена |
+| 4a | **Пробелы вокруг плейсхолдеров + SEGMENT_SEPARATOR** | **Низкий** | **Фаза 0d** | ✅ Выполнена |
+| 5 | Фаза 3 — Упрощение `node_type.py` | Низкий | Фаза 0c | Ожидает |
+| 6 | Фаза 1 — Устранение циклических зависимостей | Средний | Фаза 0c | Ожидает |
+| 7 | Фаза 2 — Консолидация дублирования | Средний | Фаза 1 | Ожидает |
+| 8 | Фаза 4 — Упрощение мелких модулей | Низкий | Фаза 1 | Ожидает |
+| 9 | Фаза 5 — Рефакторинг reconstructor | Средний | Фаза 2 | Ожидает |
+| 10 | Фаза 6 — Улучшение PlaceholderManager | Низкий | Фаза 0d | Ожидает |
+| 11 | Фаза 7 — Оптимизация Chunker | Низкий | Фаза 4 | Ожидает |
 
 **После каждой фазы** — запуск `uv run pytest tests/markdown2/ -v -s` + `uv run ruff check .`
 
@@ -396,5 +397,12 @@ markdown2/
 - [ ] Нет циклических зависимостей между модулями
 - [ ] Нет файлов > 250 строк
 - [ ] `ruff check` без предупреждений
+- [ ] Плейсхолдеры используют dunder-формат (`__X_Y_N__`) и не воспринимаются NLLB как слова ✅ (Фаза 0d)
+- [ ] Словарь кодов плейсхолдеров вынесен в `models/placeholder_codes.py` ✅ (Фаза 0d)
+- [ ] Контекст пробелов сохраняется в `Placeholder` и учитывается при реконструкции ✅ (Фаза 0d)
+- [x] Все плейсхолдеры в `extracted_text` отделены пробелами от окружаающего текста ✅ (`InlineCollector._append_tag`)
+- [x] `SEGMENT_SEPARATOR` централизован в `placeholder_codes.py`, используется в `chunker.py` и тестах ✅
+- [x] `normalize_text()` убирает пробел между закрывающим плейсхолдером и пунктуацией ✅
 - [x] Все импорты используют `from mt_server...` (не `from src.mt_server...`) ✅
 - [x] `__init__.py` есть в каждом пакете ✅
+- [x] Файлы сгруппированы по подмодулям согласно этапам пайплайна ✅ (Фаза 0c)

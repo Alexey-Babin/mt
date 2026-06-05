@@ -157,7 +157,7 @@ class TestCodeBlock:
         source_markdown = "Use the `function()` method."
 
         translation_dict = {
-            "Use the {code_1} method.": "Используйте метод {code_1}.",
+            "Use the __C_1__  method.": "Используйте метод __C_1__ .",
         }
 
         translator = mock_translator(source_markdown, translation_dict)
@@ -257,7 +257,7 @@ class TestLinkPreservation:
         source_markdown = "Visit [Example](https://example.com)."
 
         translation_dict = {
-            "Visit {lnk_1}Example{/lnk_1}.": "Посетите {lnk_1}Example{/lnk_1}."
+            "Visit __L_O_1__ Example __L_C_1__ .": "Посетите __L_O_1__ Example __L_C_1__ ."
         }
 
         translator = mock_translator(source_markdown, translation_dict)
@@ -271,7 +271,7 @@ class TestLinkPreservation:
         source_markdown = "Go to [Google](https://google.com)."
 
         translation_dict = {
-            "Go to {lnk_1}Google{/lnk_1}.": "Перейдите в {lnk_1}Google{/lnk_1}."
+            "Go to __L_O_1__ Google __L_C_1__ .": "Перейдите на __L_O_1__ Google __L_C_1__ ."
         }
 
         translator = mock_translator(source_markdown, translation_dict)
@@ -350,7 +350,7 @@ class TestMixedInlineElements:
         source_markdown = "This is **bold** and *italic* text."
 
         translation_dict = {
-            "This is {s_1}bold{/s_1} and {e_1}italic{/e_1} text.": "Это {s_1}жирный{/s_1} и {e_1}курсив{/e_1} текст."
+            "This is __B_O_1__ bold __B_C_1__  and __I_O_2__ italic __I_C_2__  text.": "Это __B_O_1__ жирный __B_C_1__  и __I_O_2__ курсив __I_C_2__  текст."
         }
 
         translator = mock_translator(source_markdown, translation_dict)
@@ -364,7 +364,7 @@ class TestMixedInlineElements:
         source_markdown = "Use `func()` or visit [Docs](https://docs.example.com)."
 
         translation_dict = {
-            "Use {code_1} or visit {lnk_1}Docs{/lnk_1}.": "Используйте {code_1} или посетите {lnk_1}Docs{/lnk_1}."
+            "Use __C_1__  or visit __L_O_2__ Docs __L_C_2__ .": "Используйте __C_1__  или посетите __L_O_2__ Docs __L_C_2__ ."
         }
 
         translator = mock_translator(source_markdown, translation_dict)
@@ -397,3 +397,71 @@ class TestEmptyInputs:
         assert check_fn(result), (
             f"Проверка не пройдена для input: {source_markdown!r}, result: {result!r}"
         )
+
+
+class TestPlaceholderSpacing:
+    """Регрессионные тесты: все плейсхолдеры в extracted_text отделены пробелами.
+
+    NLLB должна видеть каждый плейсхолдер как отдельный токен,
+    поэтому плейсхолдеры не должны прилипать к тексту.
+    """
+
+    def _get_extracted_texts(self, markdown: str) -> list[str]:
+        from src.mt_server.markdown2.ast_walker import ASTWalker
+        from src.mt_server.markdown2.parser import create_markdown_parser
+        from markdown_it.tree import SyntaxTreeNode
+
+        parser = create_markdown_parser()
+        walker = ASTWalker()
+        tokens = parser.parse(markdown)
+        tree = SyntaxTreeNode(tokens)
+        walker.walk(tree)
+        return [u.extracted_text for u in walker.units if u.extracted_text.strip()]
+
+    def test_bold_text_has_spaces_around_placeholders(self):
+        """Жирный текст: плейсхолдеры отделены пробелами."""
+        texts = self._get_extracted_texts("**bold text**")
+        assert len(texts) == 1
+        text = texts[0]
+        # Плейсхолдеры должны быть отделены пробелами
+        assert "__B_O_1__ " in text, f"Открывающий плейсхолдер не отделён: {text!r}"
+        assert " __B_C_1__" in text, f"Закрывающий плейсхолдер не отделён: {text!r}"
+
+    def test_inline_code_has_spaces_around_placeholder(self):
+        """Инлайн-код: плейсхолдер отделён пробелами."""
+        texts = self._get_extracted_texts("Use `code` here")
+        assert len(texts) == 1
+        text = texts[0]
+        assert " __C_1__ " in text, f"Плейсхолдер кода не отделён: {text!r}"
+
+    def test_link_has_spaces_around_placeholders(self):
+        """Ссылка: плейсхолдеры отделены пробелами."""
+        texts = self._get_extracted_texts("Click [link](url) now")
+        assert len(texts) == 1
+        text = texts[0]
+        assert "__L_O_1__ " in text, f"Открывающий плейсхолдер ссылки не отделён: {text!r}"
+        assert " __L_C_1__" in text, f"Закрывающий плейсхолдер ссылки не отделён: {text!r}"
+
+    def test_no_placeholder_stuck_to_text(self):
+        """Ни один плейсхолдер не должен прилипать к буквам/цифрам."""
+        import re
+
+        markdown = "This is **bold** and *italic* with `code` and [link](url)."
+        texts = self._get_extracted_texts(markdown)
+
+        placeholder_pattern = re.compile(r"__[A-Z](?:_[OC])?_\d+__")
+        for text in texts:
+            for match in placeholder_pattern.finditer(text):
+                start, end = match.start(), match.end()
+                # Символ ДО плейсхолдера (если есть) должен быть пробелом
+                if start > 0:
+                    assert text[start - 1] == " ", (
+                        f"Плейсхолдер {match.group()} прилип к тексту слева: "
+                        f"...{text[max(0, start - 5):end + 5]}..."
+                    )
+                # Символ ПОСЛЕ плейсхолдера (если есть) должен быть пробелом
+                if end < len(text):
+                    assert text[end] == " ", (
+                        f"Плейсхолдер {match.group()} прилип к тексту справа: "
+                        f"...{text[max(0, start - 5):end + 5]}..."
+                    )

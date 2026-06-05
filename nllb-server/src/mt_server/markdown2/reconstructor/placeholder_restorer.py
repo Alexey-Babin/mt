@@ -4,6 +4,10 @@
 - Нормализацию текста (очистка пробелов вокруг масок)
 - Восстановление парных тегов (ссылки, strong, em, del)
 - Восстановление атомарных тегов (code_inline, math_inline, image, breaks)
+
+Формат плейсхолдеров (dunder):
+- Парные: __X_O_N__ ... __X_C_N__ (например, __B_O_1__ ... __B_C_1__)
+- Атомарные: __X_N__ (например, __C_1__)
 """
 
 import logging
@@ -12,6 +16,7 @@ from typing import Dict, List, Tuple
 import regex as re
 
 from ..models.placeholder import Placeholder
+from ..models.placeholder_codes import PAIRED_CODES, SINGLE_TRANSLATE_CODES, PROTECT_CODES
 from ..models.translation_unit import TranslationUnit
 
 logger = logging.getLogger("uvicorn.error")
@@ -20,8 +25,11 @@ logger = logging.getLogger("uvicorn.error")
 class PlaceholderRestorer:
     """Восстанавливает плейсхолдеры обратно в Markdown-разметку."""
 
-    # Префиксы для парных транслируемых тегов
-    PAIRED_TRANSLATE_PREFIXES = {"s", "e", "del", "lnk"}
+    # Regex для парных тегов: __X_O_N__ ... __X_C_N__
+    PAIRED_REGEX = re.compile(r"__([A-Z])_O_(\d+)__(.*?)__\1_C_\2__", re.DOTALL)
+    
+    # Regex для атомарных тегов: __X_N__
+    ATOMIC_REGEX = re.compile(r"__([A-Z])_(\d+)__")
 
     def __init__(self):
         self._open_ph_map: Dict[Tuple[str, int], Placeholder] = {}
@@ -37,25 +45,24 @@ class PlaceholderRestorer:
         self.reset()
 
         for ph in placeholders:
-            clean_mask = ph.tag_mask.strip()
+            tag_mask = ph.tag_mask
 
-            # Извлекаем числовой ID из маски (например, из "{lnk_1}" вытаскиваем 1)
-            if match := re.search(r"\d+", clean_mask):
-                ph_id = int(match.group())
-                prefix = clean_mask[1:-1].split("_")[0]
+            if ph.is_closing:
+                # Закрывающие плейсхолдеры не добавляем в карты для поиска открывающих
+                continue
 
-                if ph.is_closing:
-                    # Закрывающие плейсхолдеры не добавляем в карты для поиска открывающих
-                    continue
+            # Парсим tag_mask для извлечения кода и ID
+            # Формат: __X_Y_N__ или __X_N__
+            if match := re.match(r"__([A-Z])_(?:[OC]_)?(\d+)__", tag_mask):
+                code = match.group(1)
+                ph_id = int(match.group(2))
 
-                # Для парных тегов без суффиксов (strong, link, em, s)
-                if prefix in self.PAIRED_TRANSLATE_PREFIXES:
-                    self._open_ph_map[(prefix, ph_id)] = ph
-                # Для атомарных тегов (code_inline, math_inline, etc.)
-                elif ph.node_type.endswith("_open") or not any(
-                    ph.node_type.endswith(suffix) for suffix in ["_open", "_close"]
-                ):
-                    self._atomic_ph_map[clean_mask] = ph
+                # Определяем, является ли это парным тегом
+                if code in PAIRED_CODES.values():
+                    self._open_ph_map[(code, ph_id)] = ph
+                # Атомарные теги
+                elif code in SINGLE_TRANSLATE_CODES.values() or code in PROTECT_CODES.values():
+                    self._atomic_ph_map[tag_mask] = ph
 
         logger.debug(
             "Placeholder maps built: open_tags=%d, atomic_tags=%d",
@@ -63,40 +70,21 @@ class PlaceholderRestorer:
             len(self._atomic_ph_map),
         )
 
-    def normalize_text(self, text: str, placeholders: List[Placeholder]) -> str:
-        """Нормализует текст, убирая фантомные пробелы вокруг масок.
+    # Regex для удаления пробела между закрывающим/атомарным плейсхолдером и пунктуацией.
+    # Пример: __L_C_1__ . → __L_C_1__.
+    _PLACEHOLDER_PUNCTUATION_RE = re.compile(r"(__[A-Z](?:_[OC])?_\d+__)\s+([.,!?;:)])")
 
-        Приводит маски к стандартному виду "{tag_id}".
-        Не добавляет пробел после закрывающего тега, если следующий символ - пунктуация.
+    def normalize_text(self, text: str, placeholders: List[Placeholder]) -> str:
+        """Нормализует текст после NLLB.
+
+        Плейсхолдеры уже отделены пробелами (добавлены на этапе AST-walk).
+        Здесь убираем артефактные пробелы между плейсхолдерами и пунктуацией,
+        которые NLLB могла сохранить из исходного текста.
         """
-        normalized_text = text
-        for ph in placeholders:
-            clean_mask = ph.tag_mask.strip()
-            inner_mask = clean_mask[1:-1]
-            
-            if ph.is_closing:
-                # Для закрывающих тегов: пробел перед тегом
-                # После тега: пробел НЕ добавляем, если следующий символ - пунктуация
-                # Сначала обрабатываем случай с пунктуацией
-                normalized_text = re.sub(
-                    r"\s*\{\s*" + re.escape(inner_mask) + r"\s*\}\s*([.,!?;:])",
-                    f" {clean_mask}\\1",
-                    normalized_text,
-                )
-                # Затем обрабатываем остальные случаи (если ещё не обработано)
-                normalized_text = re.sub(
-                    r"\s*\{\s*" + re.escape(inner_mask) + r"\s*\}(?!\s*[.,!?;:])(\s*)",
-                    lambda m: f" {clean_mask} " if m.group(1) or not m.end() == len(normalized_text) else f" {clean_mask}",
-                    normalized_text,
-                )
-            else:
-                # Для открывающих тегов: пробелы с обеих сторон
-                normalized_text = re.sub(
-                    r"\s*\{\s*" + re.escape(inner_mask) + r"\s*\}\s*",
-                    f" {clean_mask} ",
-                    normalized_text,
-                )
-        return normalized_text
+        normalized = self._PLACEHOLDER_PUNCTUATION_RE.sub(r"\1\2", text)
+        # Схлопываем множественные пробелы
+        normalized = re.sub(r"  +", " ", normalized)
+        return normalized
 
     def restore(self, text: str, unit: TranslationUnit) -> str:
         """Разворачивает маски плейсхолдеров обратно в Markdown разметку.
@@ -135,26 +123,23 @@ class PlaceholderRestorer:
 
     def _restore_paired_tags(self, text: str, unit: TranslationUnit) -> str:
         """Восстанавливает парные теги (ссылки, strong, em, del)."""
-        # Регулярка находит: {префикс_ID} текст {/префикс_ID}
-        paired_regex = re.compile(
-            r"\{\s*([a-zA-Z]+)_(\d+)\s*\}(.*?)\{\s*/\1_\2\s*\}", re.DOTALL
-        )
-
+        
         def replace_paired(match):
-            prefix = match.group(1)
+            code = match.group(1)  # Однобуквенный код (B, I, L, D)
             ph_id = int(match.group(2))
             inner_content = match.group(3).strip()
 
-            ph = self._open_ph_map.get((prefix, ph_id))
+            ph = self._open_ph_map.get((code, ph_id))
             if not ph:
                 logger.warning(
-                    "Paired placeholder not found in map: prefix=%s, id=%d",
-                    prefix,
+                    "Paired placeholder not found in map: code=%s, id=%d",
+                    code,
                     ph_id,
                 )
                 return match.group(0)  # Фолбек: возвращаем как есть, если тег сломан
 
-            if prefix == "lnk":
+            # Восстанавливаем в зависимости от кода
+            if code == "L":  # Link
                 href = (
                     ph.original_markup.get("href", "")
                     if isinstance(ph.original_markup, dict)
@@ -170,11 +155,11 @@ class PlaceholderRestorer:
                 logger.debug("Restored link: href=%s", href)
                 return result
 
-            elif prefix == "s":
+            elif code == "B":  # Bold (strong)
                 return f"**{inner_content}**"
-            elif prefix == "e":
+            elif code == "I":  # Italic (em)
                 return f"*{inner_content}*"
-            elif prefix == "del":
+            elif code == "D":  # strikethrough (del/s)
                 return f"~~{inner_content}~~"
 
             return inner_content
@@ -184,7 +169,7 @@ class PlaceholderRestorer:
         iteration = 0
         while old_text != text:
             old_text = text
-            text = paired_regex.sub(replace_paired, text)
+            text = self.PAIRED_REGEX.sub(replace_paired, text)
             iteration += 1
 
         if iteration > 1:
@@ -194,34 +179,30 @@ class PlaceholderRestorer:
 
     def _restore_atomic_tags(self, text: str, unit: TranslationUnit) -> str:
         """Восстанавливает атомарные теги (код, картинки, брейки, HTML)."""
-        atomic_regex = re.compile(r"\{\s*([a-zA-Z0-9_/]+)\s*\}")
+        
+        def replace_atomic(match):
+            tag_mask = match.group(0)  # Полный плейсхолдер: __X_N__
+            
+            ph = self._atomic_ph_map.get(tag_mask)
+            if not ph:
+                logger.warning("Atomic placeholder not found in map: mask=%s", tag_mask)
+                return tag_mask
 
-        return atomic_regex.sub(
-            lambda match: self._replace_atomic_tag(match, unit), text
-        )
+            # Делегируем обработку специализированным методам по типу тега
+            if ph.node_type == "code_inline":
+                return self._restore_code_inline(ph)
+            elif ph.node_type == "math_inline":
+                return self._restore_math_inline(ph)
+            elif ph.node_type in ("softbreak", "hardbreak"):
+                return self._restore_break(ph)
+            elif ph.node_type == "image":
+                return self._restore_image(ph, unit)
+            elif ph.node_type == "html_inline" or ph.node_type == "tasklist_item":
+                return self._restore_html_inline(ph)
 
-    def _replace_atomic_tag(self, match, unit: TranslationUnit) -> str:
-        """Заменяет один атомарный тег."""
-        full_mask = f"{{{match.group(1)}}}"
-        ph = self._atomic_ph_map.get(full_mask)
+            return str(ph.original_markup)
 
-        if not ph:
-            logger.warning("Atomic placeholder not found in map: mask=%s", full_mask)
-            return full_mask
-
-        # Делегируем обработку специализированным методам по типу тега
-        if ph.node_type == "code_inline":
-            return self._restore_code_inline(ph)
-        elif ph.node_type == "math_inline":
-            return self._restore_math_inline(ph)
-        elif ph.node_type in ("softbreak", "hardbreak"):
-            return self._restore_break(ph)
-        elif ph.node_type == "image":
-            return self._restore_image(ph, unit)
-        elif ph.node_type == "html_inline" or (ph.tag_mask.strip().startswith("{chk_")):
-            return self._restore_html_inline(ph)
-
-        return str(ph.original_markup)
+        return self.ATOMIC_REGEX.sub(replace_atomic, text)
 
     def _restore_code_inline(self, ph: Placeholder) -> str:
         """Восстанавливает inline код."""

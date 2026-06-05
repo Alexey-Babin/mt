@@ -11,26 +11,31 @@ When markdown translation tests fail (especially "not translated" errors), the i
 
 ## Common Root Causes
 
-1. **Wrong placeholder prefix**: `PlaceholderManager` uses specific prefixes that may differ from the raw node type
-   - Task-list checkboxes (`html_inline` nodes with `class="task-list-item-checkbox"`) use prefix `chk`, not `html`
-   - See `src/mt_server/markdown2/placeholder.py:55-66` for the mapping
+1. **Wrong placeholder format**: After Phase 0d, all placeholders use dunder format with single-letter codes
+   - Strong → `__B_O_1__` / `__B_C_1__`, Link → `__L_O_1__` / `__L_C_1__`, Code → `__C_1__`
+   - Code mapping is in `models/placeholder_codes.py` (PAIRED_CODES, SINGLE_TRANSLATE_CODES, PROTECT_CODES)
+   - Task-list checkboxes use code `T`: `__T_1__`
 
 2. **Wrong placeholder ID**: `PlaceholderManager` uses an incrementing counter, so IDs depend on the order of inline elements in the document
-   - Example: If a paragraph has `{s_1}` (strong) first, then a link gets `{lnk_2}`, not `{lnk_1}`
+   - Example: If a paragraph has `__B_O_1__` (strong) first, then a link gets `__L_O_2__`, not `__L_O_1__`
    - Always verify the exact ID from debug output, don't assume
 
-3. **Missing whitespace**: Text nodes from markdown-it include spaces between inline elements and text content
-   - Example: `{chk_1} Done task` (with space) not `{chk_1}Done task`
+3. **Placeholder spacing is critical**: All placeholders are space-separated from surrounding text by `InlineCollector._append_tag()`
+   - Format: `"This is __B_O_1__ bold __B_C_1__  text."` (spaces around every placeholder)
+   - **Test translation_dict keys MUST include spaces around placeholders** — exact match required
+   - Double spaces can occur (e.g., `__B_C_1__  text`) because `_append_tag` adds a trailing space and the next text starts with a space
 
 4. **Sentence splitting**: `split_sentences()` breaks text into segments that must match the test dictionary exactly
    - A paragraph like "This is **bold** text. Go to [Google](https://google.com)." becomes two segments:
-     - `"This is {s_1}bold{/s_1} text."`
-     - `"Go to {lnk_2}Google{/lnk_2}."`
+     - `"This is __B_O_1__ bold __B_C_1__  text."`
+     - `"Go to __L_O_2__ Google __L_C_2__ ."`
    - The mock engine does exact matching per segment, so test dictionaries must match these splits
+   - **Always add both individual segments AND the full joined sentence** to `integration_translation_dict` (as fallback)
 
-5. **Placeholder restoration issues**: `PlaceholderRestorer.normalize_text()` can add unwanted spaces
-   - Closing tags before punctuation should not have spaces: `{/lnk_2}.` not `{/lnk_2} .`
-   - Check `src/mt_server/markdown2/reconstructor/placeholder_restorer.py:66-99` for normalization logic
+5. **Placeholder restoration issues**: `PlaceholderRestorer.normalize_text()` handles post-NLLB cleanup
+   - Uses `_PLACEHOLDER_PUNCTUATION_RE` to strip space between closing/atomic tags and punctuation: `__L_C_1__ .` → `__L_C_1__.`
+   - Collapses multiple spaces: `re.sub(r"  +", " ", ...)`
+   - Check `src/mt_server/markdown2/reconstructor/placeholder_restorer.py` for current normalization logic
 
 6. **Reconstruction spacing**: Different block types require different newline handling
    - Front matter needs `\n\n` after closing `---`
@@ -75,9 +80,9 @@ When markdown translation tests fail (especially "not translated" errors), the i
 
 5. **Create a standalone debug script** to inspect the actual AST walk output:
    ```python
-   from src.mt_server.markdown2.parser import create_markdown_parser
+   from mt_server.markdown2.parser import create_markdown_parser
    from markdown_it.tree import SyntaxTreeNode
-   from src.mt_server.markdown2.ast_walker import ASTWalker
+   from mt_server.markdown2.ast_walker import ASTWalker
 
    parser = create_markdown_parser()
    tokens = parser.parse('<your_test_markdown>')
@@ -87,12 +92,10 @@ When markdown translation tests fail (especially "not translated" errors), the i
    units = walker.walk(root)
 
    for u in units:
-       if u.need_translation:
-           print(f'node_id={u.node_id}, extracted_text={repr(u.extracted_text)}')
-           if u.placeholders:
-               for ph in u.placeholders:
-                   print(f'  placeholder: mask={ph.tag_mask!r}, strategy={ph.strategy}')
+       if u.need_translation and u.extracted_text.strip():
+           print(f'  "{u.extracted_text}": "PLACEHOLDER",')
    ```
+   Use this output to build exact `translation_dict` entries for tests. The `extracted_text` will contain placeholders with spaces around them (e.g., `"This is __B_O_1__ bold __B_C_1__  text."`).
 
 6. **Match the exact format** in your test's `translation_dict`:
    - Use the exact placeholder prefix shown in the debug output
@@ -103,10 +106,13 @@ When markdown translation tests fail (especially "not translated" errors), the i
 
 ## Key Files
 
-- `src/mt_server/markdown2/placeholder.py` - Placeholder generation logic and prefix mapping
-- `src/mt_server/markdown2/handlers/inline_collector.py` - How `extracted_text` is built
+- `src/mt_server/markdown2/models/placeholder_codes.py` - Centralized placeholder code mapping (B, I, L, C, etc.) and SEGMENT_SEPARATOR
+- `src/mt_server/markdown2/models/placeholder.py` - `Placeholder` dataclass + `PlaceholderManager`
+- `src/mt_server/markdown2/ast_walker/handlers/inline_collector.py` - How `extracted_text` is built (includes `_append_tag()` for space-guaranteeing)
+- `src/mt_server/markdown2/reconstructor/placeholder_restorer.py` - Restoration + `normalize_text()` with `_PLACEHOLDER_PUNCTUATION_RE`
 - `src/mt_server/markdown2/reconstructor/main.py` - Spacing logic for lists/tables
 - `src/mt_server/markdown2/reconstructor/block_writer.py` - Buffer write operations with prefixes
 - `src/mt_server/markdown2/reconstructor/code_block_handler.py` - Fence/code block rendering
-- `src/mt_server/markdown2/chunker.py` - Text chunking and translation merging
+- `src/mt_server/markdown2/chunker.py` - Text chunking and translation merging (uses `SEGMENT_SEPARATOR`)
 - `tests/markdown2/conftest.py` - Mock translation engine implementation
+- `tests/markdown2/test_markdown_elements.py` - Includes `TestPlaceholderSpacing` regression tests

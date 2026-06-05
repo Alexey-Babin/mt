@@ -1,10 +1,18 @@
+"""Тесты PlaceholderManager с новым dunder-форматом."""
+
 from unittest.mock import MagicMock
 
 import pytest
 from src.mt_server.markdown2.models.placeholder import PlaceholderManager
+from src.mt_server.markdown2.models.placeholder_codes import (
+    PAIRED_CODES,
+    PROTECT_CODES,
+    SINGLE_TRANSLATE_CODES,
+    format_placeholder,
+    get_code,
+)
 
 
-# Фикстура для создания свежего менеджера перед каждым тестом
 @pytest.fixture
 def manager():
     return PlaceholderManager()
@@ -19,11 +27,11 @@ def test_create_placeholder_inline_protect_code(manager):
     ph = manager.create_placeholder(node)
 
     assert ph.id == 1
-    assert ph.tag_mask == " {code_1} "
+    assert ph.tag_mask == "__C_1__"
     assert ph.strategy == "INLINE_PROTECT"
     assert ph.original_markup == "`pip install pytest`"
     assert ph.is_closing is False
-    assert "{code_1}" in manager.registry
+    assert "__C_1__" in manager.registry
 
 
 def test_create_placeholder_inline_protect_math(manager):
@@ -34,7 +42,7 @@ def test_create_placeholder_inline_protect_math(manager):
 
     ph = manager.create_placeholder(node)
 
-    assert ph.tag_mask == " {math_1} "
+    assert ph.tag_mask == "__M_1__"
     assert ph.original_markup == "$E=mc^2$"
 
 
@@ -47,79 +55,119 @@ def test_create_placeholder_paired_tags_stack_logic(manager):
 
     # 1. Открываем strong
     ph_s_open = manager.create_placeholder(strong_open)
-    assert ph_s_open.tag_mask == " {s_1} "
-    assert ph_s_open.original_markup == "**"
+    assert ph_s_open.tag_mask == "__B_O_1__"
 
-    # 2. Открываем em
+    # 2. Открываем em (вложенный)
     ph_e_open = manager.create_placeholder(em_open)
-    assert ph_e_open.tag_mask == " {e_2} "
-    assert ph_e_open.original_markup == "_"
+    assert ph_e_open.tag_mask == "__I_O_2__"
 
-    # 3. Закрываем em
+    # 3. Закрываем em (ID=2)
     ph_e_close = manager.create_placeholder(em_close)
-    assert ph_e_close.tag_mask == " {/e_2} "
-    assert ph_e_close.original_markup == ""
+    assert ph_e_close.is_closing is True
+    assert ph_e_close.tag_mask == "__I_C_2__"
 
-    # 4. Закрываем strong
+    # 4. Закрываем strong (ID=1)
     ph_s_close = manager.create_placeholder(strong_close)
-    assert ph_s_close.tag_mask == " {/s_1} "
-    assert ph_s_close.original_markup == ""
+    assert ph_s_close.is_closing is True
+    assert ph_s_close.tag_mask == "__B_C_1__"
 
 
 def test_create_placeholder_link_attributes(manager):
-    """Тест извлечения атрибутов ссылки через MagicMock."""
-    node_open = MagicMock(type="link_open")
-    node_open.attrs = {"href": "https://google.com", "title": "Google"}
+    """Тест сохранения атрибутов ссылки (MagicMock)."""
+    link_open = MagicMock(type="link_open", markup="[")
+    link_open.attrs = {"href": "https://example.com", "title": "Example"}
 
-    node_close = MagicMock(type="link_close")
-    node_close.attrs = None  # Имитируем отсутствие атрибутов у закрывающего тега
+    ph = manager.create_placeholder(link_open)
 
-    ph_open = manager.create_placeholder(node_open)
-    ph_close = manager.create_placeholder(node_close)
+    assert ph.tag_mask == "__L_O_1__"
+    assert ph.strategy == "INLINE_TRANSLATE"
+    assert isinstance(ph.original_markup, dict)
+    assert ph.original_markup["href"] == "https://example.com"
+    assert ph.original_markup["title"] == "Example"
 
-    assert ph_open.tag_mask == " {lnk_1} "
-    assert isinstance(ph_open.original_markup, dict)
-    assert ph_open.original_markup["href"] == "https://google.com"
-    assert ph_open.original_markup["title"] == "Google"
-
-    assert ph_close.tag_mask == " {/lnk_1} "
+    # Закрывающий тег
+    link_close = MagicMock(type="link_close", markup="]")
+    ph_close = manager.create_placeholder(link_close)
+    assert ph_close.is_closing is True
+    assert ph_close.tag_mask == "__L_C_1__"
     assert ph_close.original_markup == ""
 
 
 def test_create_placeholder_image_as_inline_translate(manager):
-    """Тест обработки картинок через MagicMock."""
-    node = MagicMock(type="image")
-    node.content = "Альтернативный текст"
-    node.attrs = {"src": "logo.png"}
+    """Тест обработки изображения как INLINE_TRANSLATE."""
+    image = MagicMock(type="image", markup="![")
+    image.attrs = {"src": "image.png", "title": "My Image"}
+    image.content = "Alt text"
 
-    ph = manager.create_placeholder(node)
+    ph = manager.create_placeholder(image)
 
-    assert ph.tag_mask == " {img_1} "
+    assert ph.tag_mask == "__G_1__"
     assert ph.strategy == "INLINE_TRANSLATE"
-    assert ph.is_closing is False
-    assert ph.original_markup["src"] == "logo.png"
+    assert isinstance(ph.original_markup, dict)
+    assert ph.original_markup["src"] == "image.png"
+    assert ph.original_markup["title"] == "My Image"
 
 
 def test_edge_case_unbalanced_closing_tag(manager):
-    """Edge case: Внезапный закрывающий тег без открывающего (MagicMock)."""
-    node_close = MagicMock(type="strong_close")
-    node_close.attrs = None
+    """Тест несбалансированного закрывающего тега (fallback)."""
+    # Закрываем strong без открытия
+    strong_close = MagicMock(type="strong_close", markup="**")
+    ph = manager.create_placeholder(strong_close)
 
-    ph = manager.create_placeholder(node_close)
-
-    assert ph.tag_mask == " {/s_1} "
+    # Должен создать новый ID
     assert ph.is_closing is True
-    assert ph.original_markup == ""
+    assert ph.tag_mask == "__B_C_1__"
 
 
 def test_edge_case_unknown_node_type_fallback(manager):
-    """Edge case: Неизвестный тип токена (MagicMock)."""
-    node = MagicMock(type="some_rare_future_plugin_token")
-    node.content = "raw text"
-    node.attrs = None
+    """Тест неизвестного типа узла (fallback)."""
+    unknown = MagicMock(type="unknown_type", markup="?")
+    unknown.content = "some content"
 
-    ph = manager.create_placeholder(node)
+    ph = manager.create_placeholder(unknown)
 
-    assert ph.tag_mask == " {ph_1} "
-    assert ph.strategy == "INLINE_PROTECT"
-    assert ph.original_markup == "raw text"
+    # Должен использовать fallback (первая буква типа)
+    assert ph.tag_mask == "__U_1__"
+    assert ph.original_markup == "some content"
+
+
+def test_placeholder_codes_completeness():
+    """Тест полноты словаря кодов плейсхолдеров."""
+    # Проверяем, что все ожидаемые типы есть в словаре
+    expected_paired = {"strong", "em", "s", "link"}
+    assert set(PAIRED_CODES.keys()) == expected_paired
+
+    expected_protect = {
+        "code_inline",
+        "math_inline",
+        "html_inline",
+        "footnote_ref",
+        "tasklist_item",
+        "softbreak",
+        "hardbreak",
+    }
+    assert set(PROTECT_CODES.keys()) == expected_protect
+
+    expected_single = {"image"}
+    assert set(SINGLE_TRANSLATE_CODES.keys()) == expected_single
+
+
+def test_format_placeholder():
+    """Тест форматирования плейсхолдеров."""
+    assert format_placeholder("B_O", 1) == "__B_O_1__"
+    assert format_placeholder("L_C", 42) == "__L_C_42__"
+    assert format_placeholder("C", 7) == "__C_7__"
+
+
+def test_get_code():
+    """Тест получения кода для типов узлов."""
+    # Парные теги
+    assert get_code("strong_open", is_closing=False) == "B_O"
+    assert get_code("strong_close", is_closing=True) == "B_C"
+    assert get_code("em_open", is_closing=False) == "I_O"
+    assert get_code("link_open", is_closing=False) == "L_O"
+
+    # Одиночные теги
+    assert get_code("code_inline") == "C"
+    assert get_code("math_inline") == "M"
+    assert get_code("image") == "G"

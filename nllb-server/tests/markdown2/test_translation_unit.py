@@ -134,7 +134,7 @@ class TestTableTranslationUnits:
 
     def test_table_chunking_and_merging(self, chunker):
         """Тест чанкования и слияния переводов для ячеек таблицы."""
-        from src.mt_server.markdown2.chunker import REC_SEPARATOR
+        from src.mt_server.markdown2.models.placeholder_codes import SEGMENT_SEPARATOR
         from src.mt_server.markdown2.models.translation_unit import TranslationUnit
         from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
@@ -181,7 +181,7 @@ class TestTableTranslationUnits:
         assert total_segments == 4
 
         # Тестируем слияние
-        translated_response = REC_SEPARATOR.join(
+        translated_response = SEGMENT_SEPARATOR.join(
             ["Заголовок Один", "Заголовок Два", "Ячейка Одна", "Ячейка Два"]
         )
 
@@ -239,7 +239,7 @@ class TestTaskListTranslationUnits:
 
     def test_task_list_chunking_with_protected_checkbox(self, chunker):
         """Тест чанкования task list с защищенным чекбоксом."""
-        from src.mt_server.markdown2.chunker import REC_SEPARATOR
+        from src.mt_server.markdown2.models.placeholder_codes import SEGMENT_SEPARATOR
         from src.mt_server.markdown2.models.translation_unit import TranslationUnit
         from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
@@ -271,7 +271,7 @@ class TestTaskListTranslationUnits:
                 assert "{chk_1}" in segment.text or segment.text.startswith("{chk_1}")
 
         # Тестируем слияние
-        translated_response = REC_SEPARATOR.join(
+        translated_response = SEGMENT_SEPARATOR.join(
             ["{chk_1}Первый элемент задачи", "{chk_1}Второй элемент задачи"]
         )
 

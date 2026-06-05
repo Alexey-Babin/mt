@@ -1,9 +1,12 @@
+"""Управление плейсхолдерами для изоляции непереводимых элементов."""
+
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Union
 
 from markdown_it.tree import SyntaxTreeNode
 
 from .node_type import get_unit_type
+from .placeholder_codes import get_code, format_placeholder, is_paired_type
 from .translation_unit_type import TranslationUnitType
 
 
@@ -19,6 +22,10 @@ class Placeholder:
     # Содержимое для восстановления
     original_markup: Union[str, Dict[str, Any]]
     is_closing: bool = False
+    
+    # Контекст пробелов (для корректного восстановления после NLLB)
+    has_leading_space: bool = True
+    has_trailing_space: bool = True
 
 
 class PlaceholderManager:
@@ -29,6 +36,7 @@ class PlaceholderManager:
         self.registry: Dict[str, Placeholder] = {}
 
         # Хранилище активных открытых ID для парных тегов (LIFO стек)
+        # Ключ - базовый тип (например, "strong"), значение - стек ID
         self._open_tags_stacks: Dict[str, List[int]] = {}
 
     def _determine_strategy(
@@ -39,25 +47,6 @@ class PlaceholderManager:
             return "INLINE_TRANSLATE"
         return "INLINE_PROTECT"
 
-    def _get_short_prefix(self, node_type: str) -> str:
-        """Генерирует короткий читаемый префикс для маски NLLB."""
-        base_type = node_type.replace("_open", "").replace("_close", "")
-
-        mapping = {
-            "strong": "s",
-            "em": "e",
-            "link": "lnk",
-            "image": "img",
-            "code_inline": "code",
-            "math_inline": "math",
-            "html_inline": "html",
-            "footnote_ref": "fn",
-            "tasklist_item": "chk",
-            "softbreak": "br",
-            "hardbreak": "br",
-        }
-        return mapping.get(base_type, "ph")
-
     def _is_tasklist_checkbox(self, node: SyntaxTreeNode) -> bool:
         """Проверяет, является ли html_inline токеном чекбокса task-list."""
         if node.type != "html_inline":
@@ -65,41 +54,54 @@ class PlaceholderManager:
         content = node.content or ""
         return 'class="task-list-item-checkbox"' in content
 
-    def create_placeholder(self, node: SyntaxTreeNode) -> Placeholder:
-        """Создает placeholder из узла AST, извлекая оригинальную разметку."""
+    def create_placeholder(
+        self,
+        node: SyntaxTreeNode,
+        has_leading_space: bool = True,
+        has_trailing_space: bool = True,
+    ) -> Placeholder:
+        """Создает placeholder из узла AST, извлекая оригинальную разметку.
+        
+        Args:
+            node: узел AST
+            has_leading_space: есть ли пробел перед плейсхолдером
+            has_trailing_space: есть ли пробел после плейсхолдера
+        """
         # Особая обработка для task-list checkbox - трактуем как tasklist_item
         if self._is_tasklist_checkbox(node):
             unit_type = TranslationUnitType.INLINE_PROTECT
             strategy = "INLINE_PROTECT"
-            prefix = "chk"
+            base_type = "tasklist_item"
             is_closing = False
         else:
             unit_type = get_unit_type(node.type)
             strategy = self._determine_strategy(unit_type)
             is_closing = node.type.endswith("_close")
-            prefix = self._get_short_prefix(node.type)
+            base_type = node.type.replace("_open", "").replace("_close", "")
 
         # 1. Синхронизация ID для парных и одиночных тегов
         if is_closing:
-            stack = self._open_tags_stacks.get(prefix, [])
+            stack = self._open_tags_stacks.get(base_type, [])
             if stack:
                 current_id = stack.pop()
             else:
                 self._counter += 1
                 current_id = self._counter
 
-            tag_mask = f" {{/{prefix}_{current_id}}} "
+            code = get_code(base_type, is_closing=True)
+            tag_mask = format_placeholder(code, current_id)
         else:
             self._counter += 1
             current_id = self._counter
-            tag_mask = f" {{{prefix}_{current_id}}} "
+            code = get_code(base_type, is_closing=False)
+            tag_mask = format_placeholder(code, current_id)
 
             # Запоминаем ID в стек только для открывающих тегов транслируемой разметки
             # НЕ добавляем в стек, если это искусственно созданный закрывающий плейсхолдер
-            if strategy == "INLINE_TRANSLATE":
-                if prefix not in self._open_tags_stacks:
-                    self._open_tags_stacks[prefix] = []
-                self._open_tags_stacks[prefix].append(current_id)
+            if strategy == "INLINE_TRANSLATE" and is_paired_type(node.type):
+                if base_type not in self._open_tags_stacks:
+                    self._open_tags_stacks[base_type] = []
+                self._open_tags_stacks[base_type].append(current_id)
 
         # 2. Извлечение оригинального контента (original_markup)
         original_markup: Union[str, Dict[str, Any]] = ""
@@ -124,7 +126,6 @@ class PlaceholderManager:
                     original_markup = ""
                 else:
                     # Извлекаем атрибуты ссылки для воссоздания синтаксиса [текст](url)
-                    # node.attrs в markdown-it-py - это обычный dict
                     original_markup = {
                         "href": node.attrs.get("href", "") if node.attrs else "",
                         "title": node.attrs.get("title", "") if node.attrs else "",
@@ -142,7 +143,7 @@ class PlaceholderManager:
                 if is_closing:
                     original_markup = ""
                 else:
-                    fallback = {"strong": "**", "em": "*", "s": "~~"}.get(prefix, "**")
+                    fallback = {"strong": "**", "em": "*", "s": "~~"}.get(base_type, "**")
                     original_markup = getattr(node, "markup", None) or fallback
 
         # 3. Сборка объекта
@@ -153,36 +154,45 @@ class PlaceholderManager:
             node_type=node.type,
             original_markup=original_markup,
             is_closing=is_closing,
+            has_leading_space=has_leading_space,
+            has_trailing_space=has_trailing_space,
         )
 
-        self.registry[tag_mask.strip()] = placeholder
+        self.registry[tag_mask] = placeholder
         return placeholder
 
     def _create_closing_placeholder(
-        self, open_ph: Placeholder, prefix: str
+        self, open_ph: Placeholder, node_type: str
     ) -> Placeholder:
         """Создаёт закрывающий placeholder для парного тега с тем же ID.
 
         Используется когда markdown-it-py объединяет strong_open/strong_close
         в один узел strong, но нам нужны оба placeholder для корректного восстановления.
+        
+        Args:
+            open_ph: открывающий плейсхолдер
+            node_type: тип узла для извлечения base_type
         """
+        base_type = node_type.replace("_open", "").replace("_close", "")
         current_id = open_ph.id
-        tag_mask = f" {{/{prefix}_{current_id}}} "
+        code = get_code(node_type, is_closing=True)
+        tag_mask = format_placeholder(code, current_id)
 
         # Закрывающий тег не содержит оригинальной разметки, НО для ссылок (link)
         # нужно сохранить original_markup из открывающего тега для восстановления URL
-        original_markup = open_ph.original_markup if prefix == "lnk" else ""
+        original_markup = open_ph.original_markup if base_type == "link" else ""
 
         # Сборка объекта - используем тот же node_type что и у открывающего тега
-        # (для сильных это 'strong', для ссылок это 'link_open')
         placeholder = Placeholder(
             id=current_id,
             tag_mask=tag_mask,
             strategy=open_ph.strategy,
-            node_type=open_ph.node_type,  # Сохраняем оригинальный node_type
+            node_type=open_ph.node_type,
             original_markup=original_markup,
             is_closing=True,
+            has_leading_space=open_ph.has_leading_space,
+            has_trailing_space=open_ph.has_trailing_space,
         )
 
-        self.registry[tag_mask.strip()] = placeholder
+        self.registry[tag_mask] = placeholder
         return placeholder

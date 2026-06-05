@@ -20,6 +20,17 @@ class InlineCollector:
     def __init__(self, walker: "ASTWalker"):
         self._walker = walker
 
+    @staticmethod
+    def _append_tag(text: str, tag: str) -> str:
+        """Добавляет тег плейсхолдера в текст, гарантируя пробелы вокруг.
+
+        NLLB должна видеть каждый плейсхолдер как отдельный токен,
+        поэтому все плейсхолдеры отделяются пробелами от окружаающего текста.
+        """
+        if text and not text[-1].isspace():
+            text += " "
+        return text + tag + " "
+
     def collect(
         self,
         node: SyntaxTreeNode,
@@ -110,13 +121,14 @@ class InlineCollector:
         logger.debug(
             "Inline element: type=%s, mask=%s, strategy=%s",
             node.type,
-            ph.tag_mask.strip(),
+            ph.tag_mask,
             ph.strategy,
         )
 
-        # Очищаем маску от внешних служебных пробелов (.strip()), делая её вида {s_1}
-        clean_mask = ph.tag_mask.strip()
-        current_unit.extracted_text += clean_mask
+        # Добавляем маску в извлечённый текст (с пробелами вокруг)
+        current_unit.extracted_text = self._append_tag(
+            current_unit.extracted_text, ph.tag_mask
+        )
 
         if isinstance(ph.original_markup, str):
             current_unit.original_text += ph.original_markup
@@ -128,11 +140,12 @@ class InlineCollector:
         # Для парных тегов с стратегией INLINE_TRANSLATE создаём закрывающий placeholder
         if ph.strategy == "INLINE_TRANSLATE" and not ph.is_closing:
             close_ph = current_manager._create_closing_placeholder(
-                ph, prefix=current_manager._get_short_prefix(node.type)
+                ph, node_type=node.type
             )
-            close_clean_mask = close_ph.tag_mask.strip()
-            current_unit.extracted_text += close_clean_mask
+            current_unit.extracted_text = self._append_tag(
+                current_unit.extracted_text, close_ph.tag_mask
+            )
             logger.debug(
                 "Added closing placeholder for paired inline: mask=%s",
-                close_clean_mask,
+                close_ph.tag_mask,
             )

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from src.mt_server.markdown2.chunker import MarkdownChunker
+from src.mt_server.markdown2.models.placeholder_codes import SEGMENT_SEPARATOR
 from src.mt_server.markdown2.translator import MarkdownTranslator
 
 
@@ -46,9 +47,9 @@ class MockTranslationEngine:
         if text in self._translation_dict:
             return self._translation_dict[text]
 
-        # Разделитель может быть " __S__ " (с пробелами) или "\x1e"
-        if " __S__ " in text:
-            separator = " __S__ "
+        # Разделитель может быть SEGMENT_SEPARATOR (с пробелами) или "\x1e"
+        if SEGMENT_SEPARATOR in text:
+            separator = SEGMENT_SEPARATOR
         else:
             separator = "\x1e"
 
@@ -117,12 +118,13 @@ def mock_engine():
 def integration_translation_dict():
     """Словарь переводов для интеграционного теста full_pipeline."""
     return {
-        # Полный чанк со всеми сегментами, разделёнными __S__ и плейсхолдерами
-        "Some text before. __S__ This is {s_1}bold{/s_1} text. __S__ Go to {lnk_2}Google{/lnk_2}. __S__ Item 1 __S__ Nested Item 1.1 __S__ Term text __S__ Definition text __S__ Name __S__ Age __S__ John __S__ 30 __S__ Jane __S__ 25 __S__ {chk_1} Done task __S__ {chk_1} Pending task __S__ Some text after.": "Некоторый текст перед. __S__ Это {s_1}жирный{/s_1} текст. __S__ Перейдите на {lnk_2}Google{/lnk_2}. __S__ Элемент 1 __S__ Вложенный элемент 1.1 __S__ Текст термина __S__ Текст определения __S__ Имя __S__ Возраст __S__ Джон __S__ 30 __S__ Джейн __S__ 25 __S__ {chk_1} Выполненная задача __S__ {chk_1} Ожидающая задача __S__ Некоторый текст после.",
+        # Полный чанк со всеми сегментами, разделёнными SEGMENT_SEPARATOR и плейсхолдерами
+        "Some text before. __S__ This is __B_O_1__ bold __B_C_1__  text. Go to __L_O_2__ Google __L_C_2__ . __S__ Item 1 __S__ Nested Item 1.1 __S__ Term text __S__ Definition text __S__ Name __S__ Age __S__ John __S__ 30 __S__ Jane __S__ 25 __S__ __T_1__  Done task __S__ __T_1__  Pending task __S__ Some text after.": "Некоторый текст перед. __S__ Это __B_O_1__ жирный __B_C_1__  текст. Перейдите на __L_O_2__ Google __L_C_2__ . __S__ Элемент 1 __S__ Вложенный элемент 1.1 __S__ Текст термина __S__ Текст определения __S__ Имя __S__ Возраст __S__ Джон __S__ 30 __S__ Джейн __S__ 25 __S__ __T_1__  Выполненная задача __S__ __T_1__  Ожидающая задача __S__ Некоторый текст после.",
         # Также поддерживаем посегментный перевод (для гибкости)
         "Some text before.": "Некоторый текст перед.",
-        "This is {s_1}bold{/s_1} text.": "Это {s_1}жирный{/s_1} текст.",
-        "Go to {lnk_2}Google{/lnk_2}.": "Перейдите на {lnk_2}Google{/lnk_2}.",
+        "This is __B_O_1__ bold __B_C_1__  text. Go to __L_O_2__ Google __L_C_2__ .": "Это __B_O_1__ жирный __B_C_1__  текст. Перейдите на __L_O_2__ Google __L_C_2__ .",
+        "This is __B_O_1__ bold __B_C_1__  text.": "Это __B_O_1__ жирный __B_C_1__  текст.",
+        "Go to __L_O_2__ Google __L_C_2__ .": "Перейдите на __L_O_2__ Google __L_C_2__ .",
         "Item 1": "Элемент 1",
         "Nested Item 1.1": "Вложенный элемент 1.1",
         "Term text": "Текст термина",
@@ -133,8 +135,8 @@ def integration_translation_dict():
         "30": "30",
         "Jane": "Джейн",
         "25": "25",
-        "{chk_1} Done task": "{chk_1} Выполненная задача",
-        "{chk_1} Pending task": "{chk_1} Ожидающая задача",
+        "__T_1__  Done task": "__T_1__  Выполненная задача",
+        "__T_1__  Pending task": "__T_1__  Ожидающая задача",
         "Some text after.": "Некоторый текст после.",
     }
 
