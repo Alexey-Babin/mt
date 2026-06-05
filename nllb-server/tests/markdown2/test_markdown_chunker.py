@@ -7,8 +7,8 @@ from src.mt_server.markdown2.chunker import (
     MarkdownChunk,
     MarkdownChunker,
 )
-from src.mt_server.markdown2.translation_unit import TranslationUnit
-from src.mt_server.markdown2.translation_unit_type import TranslationUnitType
+from src.mt_server.markdown2.models.translation_unit import TranslationUnit
+from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
 # --- Вспомогательные фикстуры и моки ---
 

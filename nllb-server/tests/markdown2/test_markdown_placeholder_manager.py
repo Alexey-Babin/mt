@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from src.mt_server.markdown2.placeholder import PlaceholderManager
+from src.mt_server.markdown2.models.placeholder import PlaceholderManager
 
 
 # Фикстура для создания свежего менеджера перед каждым тестом

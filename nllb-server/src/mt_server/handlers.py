@@ -60,7 +60,7 @@ class MarkdownHandler(FormatHandler):
     def handle(
         self, text: str, src_lang: str, tgt_lang: str, engine: TranslationEngineProtocol
     ) -> str:
-        from .markdown2.markdown_translator import MarkdownTranslator
+        from .markdown2.translator import MarkdownTranslator
 
         translator = MarkdownTranslator(
             text=text,

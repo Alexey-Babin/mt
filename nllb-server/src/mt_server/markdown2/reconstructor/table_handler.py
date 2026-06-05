@@ -8,7 +8,7 @@
 
 import logging
 
-from ..translation_unit import TranslationUnit
+from ..models.translation_unit import TranslationUnit
 from .block_writer import BlockWriter
 from .state_machine import StateMachine
 

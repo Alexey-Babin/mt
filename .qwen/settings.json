@@ -11,8 +11,44 @@
       "Bash(pwd)",
       "Bash(env)",
       "Bash(nvidia-smi)",
-      "Agent(Explore)"
+      "Agent(Explore)",
+      "Bash(mkdir *)"
     ]
   },
-  "$version": 4
+  "$version": 4,
+  "mcpServers": {
+    "context7": {
+      "type": "streamable-http",
+      "httpUrl": "https://context7.com",
+      "headers": {
+        "CONTEXT7_API_KEY": "ctx7sk-9ea6c694-893d-4b37-8437-b7b644f7cbe8"
+      },
+      "alwaysAllow": [
+        "query-docs"
+      ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "alwaysAllow": [
+        "sequentialthinking"
+      ]
+    },
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "alwaysAllow": [
+        "search_nodes",
+        "create_nodes",
+        "add_relations",
+        "read_graph"
+      ]
+    }
+  }
 }

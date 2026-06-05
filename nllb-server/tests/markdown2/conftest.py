@@ -1,10 +1,10 @@
 """Общие фикстуры и mock-объекты для тестов markdown2."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from src.mt_server.markdown2.chunker import MarkdownChunker
-from src.mt_server.markdown2.markdown_translator import MarkdownTranslator
+from src.mt_server.markdown2.translator import MarkdownTranslator
 
 
 class MockTranslationEngine:
@@ -149,13 +149,13 @@ def mock_translator(mock_engine, integration_translation_dict):
 
     def _create_translator(text: str, translation_dict=None):
         engine = mock_engine(translation_dict or integration_translation_dict)
-        with patch("src.mt_server.markdown2.markdown_translator.max_input_tokens", 100):
-            return MarkdownTranslator(
-                text=text,
-                src_lang="eng_Latn",
-                tgt_lang="rus_Cyrl",
-                engine=engine,  # type: ignore
-            )
+        return MarkdownTranslator(
+            text=text,
+            src_lang="eng_Latn",
+            tgt_lang="rus_Cyrl",
+            engine=engine,  # type: ignore
+            max_tokens=100,
+        )
 
     return _create_translator
 
@@ -166,14 +166,12 @@ def mock_translator_with_limit(mock_engine):
 
     def _create_translator(text: str, max_tokens: int, translation_dict=None):
         engine = mock_engine(translation_dict)
-        with patch(
-            "src.mt_server.markdown2.markdown_translator.max_input_tokens", max_tokens
-        ):
-            return MarkdownTranslator(
-                text=text,
-                src_lang="eng_Latn",
-                tgt_lang="rus_Cyrl",
-                engine=engine,  # type: ignore
-            )
+        return MarkdownTranslator(
+            text=text,
+            src_lang="eng_Latn",
+            tgt_lang="rus_Cyrl",
+            engine=engine,  # type: ignore
+            max_tokens=max_tokens,
+        )
 
     return _create_translator

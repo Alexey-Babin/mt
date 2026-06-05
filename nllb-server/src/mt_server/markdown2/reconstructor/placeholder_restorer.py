@@ -11,8 +11,8 @@ from typing import Dict, List, Tuple
 
 import regex as re
 
-from ..placeholder import Placeholder
-from ..translation_unit import TranslationUnit
+from ..models.placeholder import Placeholder
+from ..models.translation_unit import TranslationUnit
 
 logger = logging.getLogger("uvicorn.error")
 

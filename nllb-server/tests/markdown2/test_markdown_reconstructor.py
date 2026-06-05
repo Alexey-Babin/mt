@@ -4,12 +4,12 @@ import pytest
 
 # Замените на ваши реальные пути импорта в проекте
 from src.mt_server.markdown2.reconstructor import MarkdownReconstructor
-from src.mt_server.markdown2.translation_unit import (
+from src.mt_server.markdown2.models.translation_unit import (
     TranslationUnit,
 )
 
-# from src.mt_server.markdown2.placeholder import Placeholder
-from src.mt_server.markdown2.translation_unit_type import TranslationUnitType
+# from src.mt_server.markdown2.models.placeholder import Placeholder
+from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
 
 @pytest.fixture

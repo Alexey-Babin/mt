@@ -6,7 +6,7 @@ import regex as re
 
 from mt_server.utils import count_tokens, split_sentences
 
-from .translation_unit import TranslationUnit
+from .models.translation_unit import TranslationUnit
 
 logger = logging.getLogger("uvicorn.error")
 

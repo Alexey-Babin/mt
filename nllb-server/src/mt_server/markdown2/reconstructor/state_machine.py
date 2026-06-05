@@ -9,7 +9,7 @@
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..translation_unit import TranslationUnit
+from ..models.translation_unit import TranslationUnit
 
 logger = logging.getLogger("uvicorn.error")
 

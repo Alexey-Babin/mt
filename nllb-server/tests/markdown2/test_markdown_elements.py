@@ -80,7 +80,7 @@ class TestTableRendering:
 
         # Проверяем структуру таблицы
         lines = result.strip().split("\n")
-        table_lines = [l for l in lines if "|" in l]
+        table_lines = [ln for ln in lines if "|" in ln]
         assert len(table_lines) >= 4, (
             f"Таблица неполная: найдено {len(table_lines)} строк, ожидалось минимум 4"
         )
@@ -122,8 +122,8 @@ class TestTaskList:
         result = translator.process()
 
         # Проверяем структуру task list
-        lines = [l.strip() for l in result.split("\n") if l.strip()]
-        task_lines = [l for l in lines if "[x]" in l or "[ ]" in l]
+        lines = [ln.strip() for ln in result.split("\n") if ln.strip()]
+        task_lines = [ln for ln in lines if "[x]" in ln or "[ ]" in ln]
         assert len(task_lines) >= 2, f"Task list элементы потеряны. Результат: {result}"
 
 
@@ -239,11 +239,11 @@ class TestNestedLists:
         translator = mock_translator(source_markdown, translation_dict)
         result = translator.process()
 
-        lines = [l for l in result.split("\n") if l.strip()]
+        lines = [ln for ln in result.split("\n") if ln.strip()]
         assert len(lines) >= 3, "Элементы списка потеряны"
 
         # Проверяем наличие вложенных элементов с отступом
-        nested_items = [l for l in lines if l.startswith("    -")]
+        nested_items = [ln for ln in lines if ln.startswith("    -")]
         assert len(nested_items) >= 2, (
             f"Вложенные элементы потеряны. Найдено: {len(nested_items)}"
         )
@@ -313,7 +313,7 @@ class TestBlockquotes:
         result = translator.process()
 
         lines = result.split("\n")
-        quote_lines = [l for l in lines if l.strip().startswith(">")]
+        quote_lines = [ln for ln in lines if ln.strip().startswith(">")]
         assert len(quote_lines) >= 3, (
             f"Строки цитаты потеряны. Найдено: {len(quote_lines)}"
         )

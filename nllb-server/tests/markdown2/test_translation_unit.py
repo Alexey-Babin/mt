@@ -16,8 +16,8 @@ class TestTableTranslationUnits:
 
         Ячейки таблицы (th/td) классифицируются как CONTEXT_BLOCK и должны переводиться.
         """
-        from src.mt_server.markdown2.translation_unit import TranslationUnit
-        from src.mt_server.markdown2.translation_unit_type import TranslationUnitType
+        from src.mt_server.markdown2.models.translation_unit import TranslationUnit
+        from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
         # Заголовки таблицы
         th1 = TranslationUnit(
@@ -135,8 +135,8 @@ class TestTableTranslationUnits:
     def test_table_chunking_and_merging(self, chunker):
         """Тест чанкования и слияния переводов для ячеек таблицы."""
         from src.mt_server.markdown2.chunker import REC_SEPARATOR
-        from src.mt_server.markdown2.translation_unit import TranslationUnit
-        from src.mt_server.markdown2.translation_unit_type import TranslationUnitType
+        from src.mt_server.markdown2.models.translation_unit import TranslationUnit
+        from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
         u1 = TranslationUnit(
             node_id="th_1",
@@ -209,8 +209,8 @@ class TestTaskListTranslationUnits:
 
         checkbox (tasklist_item) классифицируется как INLINE_PROTECT и должен защищаться плейсхолдером.
         """
-        from src.mt_server.markdown2.translation_unit import TranslationUnit
-        from src.mt_server.markdown2.translation_unit_type import TranslationUnitType
+        from src.mt_server.markdown2.models.translation_unit import TranslationUnit
+        from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
         # Элемент списка задач с чекбоксом
         task_item = TranslationUnit(
@@ -240,8 +240,8 @@ class TestTaskListTranslationUnits:
     def test_task_list_chunking_with_protected_checkbox(self, chunker):
         """Тест чанкования task list с защищенным чекбоксом."""
         from src.mt_server.markdown2.chunker import REC_SEPARATOR
-        from src.mt_server.markdown2.translation_unit import TranslationUnit
-        from src.mt_server.markdown2.translation_unit_type import TranslationUnitType
+        from src.mt_server.markdown2.models.translation_unit import TranslationUnit
+        from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
         u1 = TranslationUnit(
             node_id="p_1",
@@ -284,8 +284,8 @@ class TestTaskListTranslationUnits:
 
     def test_task_list_mixed_checkboxes(self):
         """Тест для task list с разными состояниями чекбоксов ([x] и [ ])."""
-        from src.mt_server.markdown2.translation_unit import TranslationUnit
-        from src.mt_server.markdown2.translation_unit_type import TranslationUnitType
+        from src.mt_server.markdown2.models.translation_unit import TranslationUnit
+        from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
         # Выполненная задача
         done_task = TranslationUnit(

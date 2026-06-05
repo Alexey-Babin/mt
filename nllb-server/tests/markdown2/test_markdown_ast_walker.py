@@ -4,7 +4,7 @@ import pytest
 
 # Замените на ваши реальные пути импорта
 from src.mt_server.markdown2.ast_walker import ASTWalker
-from src.mt_server.markdown2.translation_unit import TranslationUnitType
+from src.mt_server.markdown2.models.translation_unit_type import TranslationUnitType
 
 
 @pytest.fixture

@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING, Optional
 
 from markdown_it.tree import SyntaxTreeNode
 
-from ..node_type import get_unit_type
-from ..translation_unit_type import TranslationUnitType
-from ..unit_factory import UnitFactory
+from ...models.node_type import get_unit_type
+from ...models.translation_unit_type import TranslationUnitType
+from ...models.unit_factory import UnitFactory
 
 if TYPE_CHECKING:
-    from ..ast_walker import ASTWalker
+    from ..walker import ASTWalker
 
 logger = logging.getLogger("uvicorn.error")
 

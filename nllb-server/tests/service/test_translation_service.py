@@ -100,7 +100,7 @@ class TestTranslationService:
         service = TranslationService(mock_engine)
 
         with patch(
-            "mt_server.markdown2.markdown_translator.MarkdownTranslator"
+            "mt_server.markdown2.translator.MarkdownTranslator"
         ) as MockTranslator:
             mock_translator = MagicMock()
             mock_translator.process.return_value = "Translated markdown"
@@ -122,7 +122,7 @@ class TestTranslationService:
         service = TranslationService(mock_engine)
 
         with patch(
-            "mt_server.markdown2.markdown_translator.MarkdownTranslator"
+            "mt_server.markdown2.translator.MarkdownTranslator"
         ) as MockMarkdownTranslator:
             MockMarkdownTranslator.side_effect = Exception("Markdown error")
 
@@ -150,7 +150,7 @@ class TestTranslationService:
         service = TranslationService(mock_engine)
 
         with patch(
-            "mt_server.markdown2.markdown_translator.MarkdownTranslator"
+            "mt_server.markdown2.translator.MarkdownTranslator"
         ) as MockTranslator:
             mock_translator = MagicMock()
             mock_translator.process.return_value = "Translated markdown"

@@ -12,10 +12,10 @@
 import logging
 from typing import Dict, List
 
-from src.mt_server.config import settings
+from mt_server.config import settings
 
-from ..translation_unit import TranslationUnit
-from ..translation_unit_type import TranslationUnitType
+from ..models.translation_unit import TranslationUnit
+from ..models.translation_unit_type import TranslationUnitType
 from .block_writer import BlockWriter
 from .code_block_handler import CodeBlockHandler
 from .placeholder_restorer import PlaceholderRestorer

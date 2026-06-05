@@ -5,15 +5,15 @@ from markdown_it.tree import SyntaxTreeNode
 
 from mt_server.config import settings
 
+from ..models.translation_unit import TranslationUnit
+from ..models.translation_unit_type import TranslationUnitType
+from ..models.unit_factory import UnitFactory
 from .handlers import (
     ContextBlockHandler,
     InlineCollector,
     SpecialCaseHandler,
     StructuralBlockHandler,
 )
-from .translation_unit import TranslationUnit
-from .translation_unit_type import TranslationUnitType
-from .unit_factory import UnitFactory
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -44,9 +44,6 @@ class ASTWalker:
         self._node_counter += 1
         return f"node_{self._node_counter}"
 
-    def _blocks_qty(self, unit_type: TranslationUnitType):
-        return sum(1 for u in self.units if u.unit_type == unit_type)
-
     def walk(self, root: SyntaxTreeNode) -> List[TranslationUnit]:
         """Точка входа. Обходит дерево и возвращает плоский список юнитов."""
         self.units = []
@@ -64,10 +61,18 @@ class ASTWalker:
         self._traverse(root, parent_id=None, index=0)
 
         if settings.debug_mode:
-            context_blocks = self._blocks_qty(TranslationUnitType.CONTEXT_BLOCK)
-            inline_translate = self._blocks_qty(TranslationUnitType.INLINE_TRANSLATE)
-            inline_protect = self._blocks_qty(TranslationUnitType.INLINE_PROTECT)
-            structural = self._blocks_qty(TranslationUnitType.STRUCTURAL_IGNORE)
+            context_blocks = sum(
+                1 for u in self.units if u.unit_type == TranslationUnitType.CONTEXT_BLOCK
+            )
+            inline_translate = sum(
+                1 for u in self.units if u.unit_type == TranslationUnitType.INLINE_TRANSLATE
+            )
+            inline_protect = sum(
+                1 for u in self.units if u.unit_type == TranslationUnitType.INLINE_PROTECT
+            )
+            structural = sum(
+                1 for u in self.units if u.unit_type == TranslationUnitType.STRUCTURAL_IGNORE
+            )
 
             logger.debug(
                 "AST walk complete: context_blocks=%d, inline_translate=%d, inline_protect=%d, structural=%d",
